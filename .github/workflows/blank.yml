@@ -3,6 +3,10 @@ name: Ethos RF Model Wizard CI
 
 on:
   push:
+    branches:
+      - main
+    tags:
+      - 'v*'
   pull_request:
   workflow_dispatch:
 
@@ -12,6 +16,8 @@ permissions:
 jobs:
   validate-and-package:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -20,7 +26,7 @@ jobs:
       - name: Install Lua tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y lua5.4
+          sudo apt-get install -y lua5.4 zip
 
       - name: Validate Lua syntax
         shell: bash
@@ -46,3 +52,18 @@ jobs:
         with:
           name: Ethos-RF-Model-Wizard
           path: Ethos-RF-Model-Wizard.zip
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            Ethos-RF-Model-Wizard.zip \
+            --title "Ethos RF Model Wizard $RELEASE_TAG" \
+            --generate-notes \
+            --verify-tag
+        # Release publishing needs write access.
+        # See job permissions below.
