@@ -1,0 +1,48 @@
+
+name: Ethos RF Model Wizard CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Lua tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+
+      - name: Validate Lua syntax
+        shell: bash
+        run: |
+          set -e
+          mapfile -d '' files < <(find . -type f -name '*.lua' -not -path './.git/*' -print0)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No Lua files found"
+            exit 1
+          fi
+          for file in "${files[@]}"; do
+            echo "Checking $file"
+            luac5.4 -p "$file"
+          done
+
+      - name: Create ZIP package
+        run: |
+          zip -r Ethos-RF-Model-Wizard.zip . \
+            -x ".git/*" ".github/*"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ethos-RF-Model-Wizard
+          path: Ethos-RF-Model-Wizard.zip
