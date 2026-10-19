@@ -27,7 +27,7 @@ local labels = {
     "Blackbox active (CH8)", "Rescue active (CH9)"
 }
 
-local function text(value)
+local function text(value, topOffset)
     local width = lcd.getWindowSize()
     local limit = math.max(16, math.floor((width - 16) / 14))
     while #value > 0 do
@@ -42,7 +42,7 @@ local function text(value)
             end
         end
         form.addStaticText(form.addLine("", nil, false),
-            {x = 0, y = 0, w = width - 16, h = 40}, value:sub(1, count))
+            {x = 0, y = topOffset or 0, w = width - 16, h = 40}, value:sub(1, count))
         value = value:sub(count + 1):gsub("^ +", "")
     end
 end
@@ -139,7 +139,7 @@ function wizard.available(page)
 end
 
 function wizard.build(page)
-    text(page == 7 and (layout == layouts.elrs and "Rotorflight review: ELRS" or "Rotorflight review: Standard") or "Rotorflight switch setup")
+    text(page == 7 and (layout == layouts.elrs and "Rotorflight review: ELRS" or "Rotorflight review: Standard") or "Rotorflight switch setup", 12)
     if attempted then text("Draft locked; restart creation to edit.") end
     if page == 1 then
         text("System > Sticks: First four channels fixed OFF.")
