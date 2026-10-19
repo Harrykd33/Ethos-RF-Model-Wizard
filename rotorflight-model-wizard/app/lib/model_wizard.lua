@@ -7,8 +7,19 @@
 local wizard = {}
 local enabled, reviewed, attempted, allocationConfirmed = false, false, false, false
 local otherConfirmed = false
+local ignored = {}
 local positions = {}
-local channelNames = {"Aileron", "Elevator", "RF Throttle", "Rudder", "Pitch", "RF Arm", "RF Profile", "RF Blackbox", "RF Rescue"}
+local layouts = {
+    standard = {
+        names = {"Aileron", "Elevator", "RF Throttle", "Rudder", "Pitch", "RF Arm", "RF Profile", "RF Blackbox", "RF Rescue"},
+        arm = 6, throttle = 3, collective = 5
+    },
+    elrs = {
+        names = {"Aileron", "Elevator", "Pitch", "Rudder", "RF Arm", "RF Throttle", "RF Profile", "RF Blackbox", "RF Rescue"},
+        arm = 5, throttle = 6, collective = 3
+    }
+}
+local layout = layouts.standard
 local labels = {
     "Armed position (CH6)", "Throttle hold (CH3)",
     "Profile 1 (CH7 -100%)", "Profile 2 (CH7 0%)", "Profile 3 (CH7 +100%)",
@@ -35,14 +46,40 @@ local function text(value)
     end
 end
 
+local function switchLabel(index)
+    if index == 1 then return "Armed position (CH" .. layout.arm .. ")" end
+    if index == 2 then return "Throttle hold (CH" .. layout.throttle .. ")" end
+    return labels[index]
+end
+
 local function switchField(index)
-    local field = form.addSwitchField(form.addLine(labels[index]), nil,
+    local field = form.addSwitchField(form.addLine(switchLabel(index)), nil,
         function() return positions[index] end,
-        function(value) positions[index] = value; reviewed = false end)
+        function(value)
+            if attempted then return end
+            positions[index] = value; reviewed = false
+        end)
+    field:enable(not attempted and not ignored[index])
+    return field
+end
+
+local function optionalSwitch(index, label)
+    local assignment
+    local field = form.addBooleanField(form.addLine(label), nil,
+        function() return ignored[index] == true end,
+        function(value)
+            if attempted then return end
+            ignored[index] = value
+            reviewed = false
+            if assignment then assignment:enable(not value) end
+        end)
     field:enable(not attempted)
+    text("Ignore keeps this channel inactive at -100%.")
+    assignment = switchField(index)
 end
 
 local function positionName(index)
+    if ignored[index] then return "Ignored" end
     local source = positions[index]
     return source and source:name() or "---"
 end
@@ -56,12 +93,12 @@ local function physicalSwitch(source)
 end
 
 local function validate()
-    if not otherConfirmed then return "Restart model creation and select Other, then confirm the model type." end
-    if not allocationConfirmed then return "Confirm First four channels fixed is OFF in System > Sticks." end
+    if not otherConfirmed then return "Restart creation: select Other, then confirm it." end
+    if not allocationConfirmed then return "System > Sticks: confirm First four fixed OFF." end
     for i = 1, #labels do
         local source = positions[i]
-        if not source or source:category() ~= CATEGORY_SWITCH_POSITION or source:options() ~= 0 then
-            return "Select a physical switch position:" .. " " .. labels[i]
+        if not ignored[i] and (not source or source:category() ~= CATEGORY_SWITCH_POSITION or source:options() ~= 0) then
+            return "Select a physical switch position:" .. " " .. switchLabel(i)
         end
     end
     local a, b, c = positions[3], positions[4], positions[5]
@@ -70,16 +107,18 @@ local function validate()
         return "Use all three positions of one switch for each selector."
     end
     if physicalSwitch(positions[1]) == physicalSwitch(positions[2])
-        or physicalSwitch(positions[1]) == physicalSwitch(positions[7])
-        or physicalSwitch(positions[2]) == physicalSwitch(positions[7]) then
+        or (not ignored[7] and (physicalSwitch(positions[1]) == physicalSwitch(positions[7])
+            or physicalSwitch(positions[2]) == physicalSwitch(positions[7]))) then
         return "Arm, hold and rescue need separate switches."
     end
 end
 
 function wizard.close()
     for key in pairs(positions) do positions[key] = nil end
+    for key in pairs(ignored) do ignored[key] = nil end
     enabled, reviewed, attempted, allocationConfirmed = false, false, false, false
     otherConfirmed = false
+    layout = layouts.standard
 end
 
 function wizard.available()
@@ -87,10 +126,9 @@ function wizard.available()
 end
 
 function wizard.build(page)
-    text("Rotorflight switch setup")
+    text(page == 7 and (layout == layouts.elrs and "Rotorflight review: ELRS" or "Rotorflight review: Standard") or "Rotorflight switch setup")
     if attempted then text("Draft locked; restart creation to edit.") end
     if page == 1 then
-        text("Choose Other for the Rotorflight channel map.")
         text("System > Sticks: First four channels fixed OFF.")
         local field = form.addBooleanField(form.addLine("Other model selected"), nil,
             function() return otherConfirmed end,
@@ -102,45 +140,65 @@ function wizard.build(page)
         field:enable(not attempted)
         field = form.addBooleanField(form.addLine("Set up Rotorflight switches"), nil,
             function() return enabled end,
-            function(value) enabled = value; reviewed = false end)
+            function(value)
+                if attempted then return end
+                enabled = value
+                if not value then layout = layouts.standard end
+                reviewed = false
+            end)
+        field:enable(not attempted)
+        field = form.addBooleanField(form.addLine("Use ELRS channel order"), nil,
+            function() return layout == layouts.elrs end,
+            function(value)
+                if attempted then return end
+                layout = value and layouts.elrs or layouts.standard
+                -- Selecting an ELRS model also opts into its setup pages.
+                if value then enabled = true end
+                reviewed = false
+            end)
         field:enable(not attempted)
     elseif page == 2 then
         switchField(1)
     elseif page == 3 then
-        text("CH3: hold -100%, released +100% (FC governor).")
+        text("CH" .. layout.throttle .. ": hold -100%, released +100% (FC governor).")
         switchField(2)
     elseif page == 4 then
         text("CH7 selects both rates and profile: -100%, 0%, +100%.")
         for i = 3, 5 do switchField(i) end
     elseif page == 5 then
-        switchField(6)
+        optionalSwitch(6, "Ignore blackbox")
     elseif page == 6 then
-        switchField(7)
+        optionalSwitch(7, "Ignore rescue")
     elseif page == 7 then
-        text("CH1 Ail / CH2 Ele / CH4 Rud / CH5 Collective")
-        reviewRow("CH6 Arm / CH3 Hold", positionName(1) .. " / " .. positionName(2))
+        local problem = validate()
+        -- Keep the confirmation above the summary and any validation message.
+        -- Missing assignments must never push it beneath native navigation.
+        if not attempted then
+            local field
+            field = form.addBooleanField(form.addLine("Create reviewed CH1-CH9"), nil,
+                function() return reviewed end,
+                function(value)
+                    if not value or attempted then return end
+                    reviewed = true
+                    -- Other omits Ethos's channel-review run callback.
+                    wizard.run()
+                    field:enable(false)
+                end)
+            field:enable(problem == nil)
+        end
+        if problem then
+            text(problem)
+        else
+            text("CH1 Ail / CH2 Ele / CH4 Rud / CH" .. layout.collective .. " Collective")
+        end
+        reviewRow("CH" .. layout.arm .. " Arm / CH" .. layout.throttle .. " Hold", positionName(1) .. " / " .. positionName(2))
         reviewRow("CH7 Rates / Profile", positionName(3) .. " / " .. positionName(4) .. " / " .. positionName(5))
         reviewRow("CH8 Blackbox / CH9 Rescue", positionName(6) .. " / " .. positionName(7))
-        local problem = validate()
-        if problem then text(problem) end
-        if attempted then return end
-        local field
-        field = form.addBooleanField(form.addLine("Create reviewed CH1-CH9"), nil,
-            function() return reviewed end,
-            function(value)
-                if not value or attempted then return end
-                reviewed = true
-                -- Other omits Ethos's channel-review page and its run callback.
-                -- This explicit confirmation must generate the draft itself.
-                wizard.run()
-                field:enable(false)
-            end)
-        field:enable(problem == nil and not attempted)
     end
 end
 
 local function addMix(index, spec)
-    spec.name = channelNames[index]
+    spec.name = layout.names[index]
     model.createMix("free", spec)
     -- Native wizard output allocation is deferred until the model is saved.
     -- getChannel() here reads the active model, not the draft being built.
@@ -165,17 +223,29 @@ function wizard.run()
     attempted = true
     stick(1, 3) -- Aileron
     stick(2, 1) -- Elevator
-    binary(3, positions[2], -100, 100)
+    -- Sequential free-mix allocation determines channel numbers.
+    if layout == layouts.elrs then stick(3, 2) else binary(3, positions[2], -100, 100) end
     stick(4, 0) -- Rudder
-    stick(5, 2) -- Collective, independent of the governor command on CH3.
-    binary(6, positions[1], 100, -100)
+    if layout == layouts.elrs then
+        binary(5, positions[1], 100, -100) -- ELRS AUX1 arm, low when disarmed.
+        binary(6, positions[2], -100, 100) -- FC governor command.
+    else
+        stick(5, 2) -- Collective, independent of throttle hold.
+        binary(6, positions[1], 100, -100)
+    end
     addMix(7, {actions = {
         {action = "offset", condition = positions[3], active = -100, inactive = 0},
         {action = "offset", condition = positions[4], active = 0, inactive = 0},
         {action = "offset", condition = positions[5], active = 100, inactive = 0}
     }})
-    binary(8, positions[6], 100, -100)
-    binary(9, positions[7], 100, -100)
+    -- Retain both slots when ignored so later channel numbers cannot shift.
+    for index = 6, 7 do
+        if ignored[index] then
+            binary(index + 2, nil, -100, -100)
+        else
+            binary(index + 2, positions[index], 100, -100)
+        end
+    end
 end
 
 return wizard
