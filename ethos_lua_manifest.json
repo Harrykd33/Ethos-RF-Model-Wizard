@@ -1,0 +1,10 @@
+{
+  "manifestVersion": 1,
+  "name": "Rotorflight Model Wizard",
+  "key": "org.rotorflight.ethos-model-wizard",
+  "version": "0.2.1",
+  "folder": "rotorflight-model-wizard",
+  "files": [
+    "rotorflight-model-wizard/**"
+  ]
+}
