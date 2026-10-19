@@ -7,6 +7,7 @@
 local wizard = {}
 local enabled, reviewed, attempted, allocationConfirmed = false, false, false, false
 local otherConfirmed = false
+local categoryMode = false
 local ignored = {}
 local positions = {}
 local layouts = {
@@ -63,7 +64,7 @@ local function switchField(index)
     return field
 end
 
-local function optionalSwitch(index, label)
+local function optionalSwitch(index, label, optionOnly)
     local assignment
     local field = form.addBooleanField(form.addLine(label), nil,
         function() return ignored[index] == true end,
@@ -74,8 +75,10 @@ local function optionalSwitch(index, label)
             if assignment then assignment:enable(not value) end
         end)
     field:enable(not attempted)
-    text("Ignore keeps this channel inactive at -100%.")
-    assignment = switchField(index)
+    if not optionOnly then
+        text("Ignore keeps this channel inactive at -100%.")
+        assignment = switchField(index)
+    end
 end
 
 local function positionName(index)
@@ -117,12 +120,22 @@ function wizard.close()
     for key in pairs(positions) do positions[key] = nil end
     for key in pairs(ignored) do ignored[key] = nil end
     enabled, reviewed, attempted, allocationConfirmed = false, false, false, false
-    otherConfirmed = false
+    otherConfirmed, categoryMode = false, false
     layout = layouts.standard
 end
 
-function wizard.available()
-    return enabled
+function wizard.startCategory()
+    wizard.close()
+    categoryMode, enabled, otherConfirmed = true, true, true
+end
+
+function wizard.available(page)
+    if not enabled then return false end
+    if categoryMode then
+        if page == 5 then return not ignored[6] end
+        if page == 6 then return not ignored[7] end
+    end
+    return true
 end
 
 function wizard.build(page)
@@ -130,23 +143,34 @@ function wizard.build(page)
     if attempted then text("Draft locked; restart creation to edit.") end
     if page == 1 then
         text("System > Sticks: First four channels fixed OFF.")
-        local field = form.addBooleanField(form.addLine("Other model selected"), nil,
-            function() return otherConfirmed end,
-            function(value) otherConfirmed = value; reviewed = false end)
-        field:enable(not attempted)
+        local field
+        if not categoryMode then
+            field = form.addBooleanField(form.addLine("Other model selected"), nil,
+                function() return otherConfirmed end,
+                function(value)
+                    if attempted then return end
+                    otherConfirmed = value; reviewed = false
+                end)
+            field:enable(not attempted)
+        end
         field = form.addBooleanField(form.addLine("First four fixed OFF"), nil,
             function() return allocationConfirmed end,
-            function(value) allocationConfirmed = value; reviewed = false end)
-        field:enable(not attempted)
-        field = form.addBooleanField(form.addLine("Set up Rotorflight switches"), nil,
-            function() return enabled end,
             function(value)
                 if attempted then return end
-                enabled = value
-                if not value then layout = layouts.standard end
-                reviewed = false
+                allocationConfirmed = value; reviewed = false
             end)
         field:enable(not attempted)
+        if not categoryMode then
+            field = form.addBooleanField(form.addLine("Set up Rotorflight switches"), nil,
+                function() return enabled end,
+                function(value)
+                    if attempted then return end
+                    enabled = value
+                    if not value then layout = layouts.standard end
+                    reviewed = false
+                end)
+            field:enable(not attempted)
+        end
         field = form.addBooleanField(form.addLine("Use ELRS channel order"), nil,
             function() return layout == layouts.elrs end,
             function(value)
@@ -157,6 +181,10 @@ function wizard.build(page)
                 reviewed = false
             end)
         field:enable(not attempted)
+        if categoryMode then
+            optionalSwitch(6, "Ignore blackbox", true)
+            optionalSwitch(7, "Ignore rescue", true)
+        end
     elseif page == 2 then
         switchField(1)
     elseif page == 3 then
@@ -166,14 +194,17 @@ function wizard.build(page)
         text("CH7 selects both rates and profile: -100%, 0%, +100%.")
         for i = 3, 5 do switchField(i) end
     elseif page == 5 then
-        optionalSwitch(6, "Ignore blackbox")
+        if categoryMode then switchField(6) else optionalSwitch(6, "Ignore blackbox") end
     elseif page == 6 then
-        optionalSwitch(7, "Ignore rescue")
+        if categoryMode then switchField(7) else optionalSwitch(7, "Ignore rescue") end
     elseif page == 7 then
         local problem = validate()
         -- Keep the confirmation above the summary and any validation message.
         -- Missing assignments must never push it beneath native navigation.
-        if not attempted then
+        if categoryMode then
+            if not attempted then reviewed = problem == nil end
+            text(problem and "Complete required assignments before Next." or "Next creates reviewed CH1-CH9.")
+        elseif not attempted then
             local field
             field = form.addBooleanField(form.addLine("Create reviewed CH1-CH9"), nil,
                 function() return reviewed end,
@@ -221,16 +252,16 @@ function wizard.run()
     -- Require the Other / first-four-fixed-OFF preparation, then create the
     -- entire map in order. Never retry a failed/partial generation.
     attempted = true
-    stick(1, 3) -- Aileron
-    stick(2, 1) -- Elevator
+    stick(1, ANALOG_STICK_AILERON) -- Aileron
+    stick(2, ANALOG_STICK_ELEVATOR) -- Elevator
     -- Sequential free-mix allocation determines channel numbers.
-    if layout == layouts.elrs then stick(3, 2) else binary(3, positions[2], -100, 100) end
-    stick(4, 0) -- Rudder
+    if layout == layouts.elrs then stick(3, ANALOG_STICK_THROTTLE) else binary(3, positions[2], -100, 100) end
+    stick(4, ANALOG_STICK_RUDDER) -- Rudder
     if layout == layouts.elrs then
         binary(5, positions[1], 100, -100) -- ELRS AUX1 arm, low when disarmed.
         binary(6, positions[2], -100, 100) -- FC governor command.
     else
-        stick(5, 2) -- Collective, independent of throttle hold.
+        stick(5, ANALOG_STICK_THROTTLE) -- Collective, independent of throttle hold.
         binary(6, positions[1], 100, -100)
     end
     addMix(7, {actions = {

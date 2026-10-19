@@ -2,12 +2,15 @@
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 import json
+import subprocess
+import sys
 
 ROOT = Path(__file__).resolve().parent
-FILES = ("main.lua", "lib/register_model_wizard.lua", "app/lib/model_wizard.lua", "README.md")
+FILES = ("main.lua", "icon.png", "lib/register_model_wizard.lua", "app/lib/model_wizard.lua", "README.md")
 
 
 def main():
+    subprocess.run([sys.executable, str(ROOT / "assets/build_icon.py")], check=True)
     manifest = ROOT / "ethos_lua_manifest.json"
     folder = json.loads(manifest.read_text(encoding="utf-8"))["folder"]
     archive = ROOT / "rotorflight-model-wizard-standalone-en.zip"

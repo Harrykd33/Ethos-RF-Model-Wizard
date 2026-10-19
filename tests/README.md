@@ -8,6 +8,7 @@ Stage the following files at the scratch workspace root:
 
 - rotorflight-model-wizard/app/lib/model_wizard.lua as controller.lua
 - rotorflight-model-wizard/lib/register_model_wizard.lua as register.lua
+- rotorflight-model-wizard/icon.png as icon.png
 - tests/model_wizard.lua as check.lua
 
 Run /check.lua using the simulator macro runner. Test the standard layout
@@ -43,3 +44,30 @@ Native tests also saved standard/ELRS models with both options assigned and
 both ignored. Review screenshots were checked with missing assignments and
 with both options ignored: the create control stays near the top, clear of
 the navigation footer, and is disabled when required assignments are missing.
+
+## Custom category API (0.5.0)
+
+Prefix the macro with `TEST_CATEGORY = true` to test category controller mode.
+The registration section always tests both the old API and a shim of
+`system.registerWizard(name, icon, pages)`. It checks feature detection,
+registration without registerWizardPage, absolute paths, real mask loading,
+lazy controller loading, one mask load, reset behavior, optional-page
+availability, centralized final run, and missing-input rejection.
+
+Category and legacy modes passed all layouts and ignore combinations:
+16 variants / 768 switch combinations, with real 26.1.2 source/mix/output
+and model-save APIs. Named analog constants were verified on 26.1.2 and
+26.2.0-RC1. Neither cached firmware supplies system.registerWizard.
+
+The legacy native Create model flow saved standard and ELRS models with
+both optional functions assigned and both ignored. Category forms were
+rendered with a test-only adapter to registerWizardPage for visual checks,
+including a valid review, missing assignments and skipped optional pages.
+This adapter does not verify the actual new category tile or native run
+callback timing.
+
+Required follow-up on real supporting firmware (announced for 26.2.0-RC2):
+select the Rotorflight tile; verify both layouts, each optional-page
+combination, invalid inputs, review -> Next -> name -> save, Back navigation,
+cancel/restart, and exact CH1-CH9 with ignored channels at -100%. Confirm
+that native run happens after the review and runs only once per draft.

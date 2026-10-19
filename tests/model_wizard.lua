@@ -15,10 +15,10 @@ simulator.sleep(0.2)
 
 end
 
-local fields = {}
+local fields, texts = {}, {}
 local nativeForm, nativeWindowSize = form, lcd.getWindowSize
 lcd.getWindowSize = function() return 800, 480 end
-form = {addLine = function(label) return label end, addStaticText = function() end}
+form = {addLine = function(label) return label end, addStaticText = function(_, _, value) texts[value] = true end}
 local function field(label, _, get, set)
     local result = {get = get, set = set}
     result.enable = function(_, value) result.enabled = value end
@@ -64,6 +64,37 @@ register("SCRIPTS:/rotorflight-model-wizard")
 descriptors[1].build()
 assert(loads == 3 and #descriptors == 7)
 assert(lastControllerPath == "SCRIPTS:/rotorflight-model-wizard/app/lib/model_wizard.lua", "Standalone callback must use its absolute path")
+-- Exercise the new registration contract even on firmware without RC2.
+-- Only registration is shimmed; mask loading and the controller use real Lua APIs.
+local nativeCategoryRegister, nativeLoadMask = system.registerWizard, lcd.loadMask
+local category, maskLoads = nil, 0
+system.registerWizardPage = nil
+system.registerWizard = function(name, icon, pages)
+    assert(name == "Rotorflight" and icon and #pages == 7, "Category registration")
+    category = pages
+end
+lcd.loadMask = function(path)
+    assert(path == "SCRIPTS:/rotorflight-model-wizard/icon.png", "Absolute icon path")
+    maskLoads = maskLoads + 1
+    return nativeLoadMask("/icon.png")
+end
+local beforeLoads = loads
+register("SCRIPTS:/rotorflight-model-wizard")
+assert(category and loads == beforeLoads and maskLoads == 1, "Category registration remains lazy")
+for key in pairs(fields) do fields[key] = nil end
+category[1].build()
+assert(loads == beforeLoads + 1 and category[2].available(), "Selecting category starts setup")
+assert(not fields["Other model selected"] and not fields["Set up Rotorflight switches"], "No redundant category opt-ins")
+fields["Ignore blackbox"].set(true)
+assert(not category[5].available() and category[6].available() and category[7].available(), "Skip blackbox page only")
+fields["Ignore rescue"].set(true)
+assert(not category[6].available() and category[7].available(), "Skip rescue, retain centralized final run")
+assert(not pcall(category[7].run), "Invalid category draft rejected before creation")
+category[1].init()
+category[1].build()
+assert(category[5].available() and category[6].available() and not fields["Use ELRS channel order"].get(), "Category restart resets options")
+assert(maskLoads == 1, "Mask loaded once at registration")
+system.registerWizard, lcd.loadMask = nativeCategoryRegister, nativeLoadMask
 system.registerWizardPage, loadfile = nativeRegister, nativeLoadfile
 
 local wizard = assert(loadfile("/controller.lua"))()
@@ -75,10 +106,17 @@ local holdLabel = "Throttle hold (CH" .. throttleChannel .. ")"
 local function output(channel) return system.getSource({category = CATEGORY_CHANNEL, member = channel - 1}):value() end
 assert(not wizard.available())
 wizard.run()
-wizard.build(1)
-set("Set up Rotorflight switches", true)
-assert(not pcall(wizard.run), "Preparation must be confirmed")
-set("Other model selected", true)
+for key in pairs(fields) do fields[key] = nil end
+if TEST_CATEGORY then
+    wizard.startCategory()
+    wizard.build(1)
+    assert(wizard.available() and not fields["Other model selected"] and not fields["Set up Rotorflight switches"], "Category starts enabled")
+else
+    wizard.build(1)
+    set("Set up Rotorflight switches", true)
+    assert(not pcall(wizard.run), "Preparation must be confirmed")
+    set("Other model selected", true)
+end
 assert(not pcall(wizard.run), "Allocation preparation must be confirmed")
 set("First four fixed OFF", true)
 assert(not fields["Use ELRS channel order"].get(), "Standard layout by default")
@@ -95,43 +133,62 @@ set("Profile 3 (CH7 +100%)", position(8))
 for _, item in ipairs({{"Ignore blackbox", "Blackbox active (CH8)"}, {"Ignore rescue", "Rescue active (CH9)"}}) do
     assert(not fields[item[1]].get(), "Optional switch defaults to assigned")
     set(item[1], true)
-    assert(not fields[item[2]].enabled, "Ignored switch disabled")
+    if TEST_CATEGORY then
+        assert(not wizard.available(item[1] == "Ignore blackbox" and 5 or 6), "Ignored assignment page hidden")
+    else
+        assert(not fields[item[2]].enabled, "Ignored switch disabled")
+    end
     set(item[1], false)
-    assert(fields[item[2]].enabled, "Restored switch enabled")
+    if TEST_CATEGORY then
+        assert(wizard.available(item[1] == "Ignore blackbox" and 5 or 6), "Restored assignment page available")
+    else
+        assert(fields[item[2]].enabled, "Restored switch enabled")
+    end
 end
 if TEST_IGNORE_BLACKBOX then set("Ignore blackbox", true)
 else set("Blackbox active (CH8)", position(9)) end
 if TEST_IGNORE_RESCUE then set("Ignore rescue", true)
 else set("Rescue active (CH9)", position(12)) end
-wizard.build(7)
-assert(fields["Create reviewed CH1-CH9"].enabled, "Unassigned ignored switches permit review")
+assert(not pcall(wizard.run), "Generation requires a completed review")
+local function reviewReady(expected)
+    for key in pairs(texts) do texts[key] = nil end
+    wizard.build(7)
+    if TEST_CATEGORY then
+        assert(not fields["Create reviewed CH1-CH9"], "Category uses native Next/run")
+        assert(texts[expected and "Next creates reviewed CH1-CH9." or "Complete required assignments before Next."], "Category review validity")
+    else
+        assert(fields["Create reviewed CH1-CH9"].enabled == expected, "Legacy review validity")
+    end
+end
+reviewReady(true)
 if TEST_IGNORE_BLACKBOX then
     set("Ignore blackbox", false)
-    wizard.build(7)
-    assert(not fields["Create reviewed CH1-CH9"].enabled, "Blackbox required again when restored")
+    reviewReady(false)
+    assert(not pcall(wizard.run), "Blackbox required again when restored")
     set("Ignore blackbox", true)
     wizard.build(7)
 end
 if TEST_IGNORE_RESCUE then
     set("Ignore rescue", false)
-    wizard.build(7)
-    assert(not fields["Create reviewed CH1-CH9"].enabled, "Rescue required again when restored")
+    reviewReady(false)
+    assert(not pcall(wizard.run), "Rescue required again when restored")
     set("Rescue active (CH9)", position(0))
-    wizard.build(7)
-    assert(not fields["Create reviewed CH1-CH9"].enabled, "Active rescue cannot share arm switch")
+    reviewReady(false)
+    assert(not pcall(wizard.run), "Active rescue cannot share arm switch")
     set("Ignore rescue", true)
-    wizard.build(7)
-    assert(fields["Create reviewed CH1-CH9"].enabled, "Ignored rescue may retain an unused colliding selection")
+    reviewReady(true) -- An ignored rescue may retain an unused colliding selection.
     set("Rescue active (CH9)", nil)
 end
-assert(not pcall(wizard.run), "Review must be confirmed")
+if not TEST_CATEGORY then assert(not pcall(wizard.run), "Review must be confirmed") end
 set("Profile 2 (CH7 0%)", position(6))
 assert(not pcall(wizard.run), "Duplicated profile position")
 set("Profile 2 (CH7 0%)", position(7))
 set(holdLabel, position(2))
 assert(not pcall(wizard.run), "Arm and hold must be independent")
 set(holdLabel, position(3))
-set("Create reviewed CH1-CH9", true) -- The confirmation generates Other drafts.
+reviewReady(true)
+if TEST_CATEGORY then wizard.run() -- Native final-page callback generates all channels.
+else set("Create reviewed CH1-CH9", true) end -- Legacy Other requires explicit generation.
 model.dirty() -- The macro uses a live test model; native creation saves its draft.
 wizard.run()
 local names = TEST_ELRS
@@ -208,4 +265,4 @@ wizard.build(6)
 assert(not fields["Ignore blackbox"].get() and not fields["Ignore rescue"].get(), "Cleanup resets ignore flags")
 lcd.getWindowSize = nativeWindowSize
 form = nativeForm
-print((TEST_ELRS and "ELRS " or "Standard ") .. "PASS: nine exact channels, 48 switch combinations, sticks, save/reload, validation, optional switches and cleanup")
+print((TEST_CATEGORY and "Category " or "Legacy ") .. (TEST_ELRS and "ELRS " or "Standard ") .. "PASS: nine exact channels, 48 switch combinations, sticks, save/reload, validation, optional switches and cleanup")

@@ -13,11 +13,24 @@ flight controller are not required to create the model.
 - Ethos firmware supporting Lua wizard pages and mix creation. Tested with
   X18RS simulators running **26.1.2** and **26.2.0-RC1**.
 - **System > Sticks > First four channels fixed** set to **OFF**.
-- A new model created using the **Other** model type.
+- Select the **Rotorflight** category when available, or **Other** on older firmware.
 
-The model type and stick setting are essential for the channel order below.
-The wizard's preparation checkboxes confirm that you have set them; they do
-not change those settings automatically.
+The package detects `system.registerWizard()` at startup. Supporting firmware
+gets a dedicated **Rotorflight** category; older firmware automatically uses
+the existing wizard pages under **Other**. The new API was announced for
+**26.2.0-RC2**. The 26.1.2 and 26.2.0-RC1 simulators do not provide it.
+
+The **First four channels fixed OFF** checkbox confirms your manual stick
+setting; the wizard does not change that setting automatically. The new
+Rotorflight category selects the Other model type automatically.
+
+The category registration and controller were tested with an API shim on
+26.1.2, including real mix outputs and persistence. Category page layouts were
+rendered through a test adapter. The real RC2 category tile and automatic
+callback timing still need verification on supporting firmware.
+
+API references: [registerWizard](https://ethos-lua-doc.frsky-rc.com/api/system/registerWizard/)
+and [registerWizardPage](https://ethos-lua-doc.frsky-rc.com/api/system/registerWizardPage/).
 
 ## Installation
 
@@ -33,6 +46,7 @@ The installed files should be arranged as follows:
 scripts/
   rotorflight-model-wizard/
     main.lua
+    icon.png
     README.md
     lib/
       register_model_wizard.lua
@@ -42,7 +56,7 @@ scripts/
 ```
 
 Keep the folder name **rotorflight-model-wizard** unchanged. Keep all three
-Lua files together; copying only `main.lua` is insufficient. The script uses
+Lua files and `icon.png` together; copying only `main.lua` is insufficient. The script uses
 absolute file paths so its later callbacks work on physical radios.
 
 ### Using it alongside the full suite
@@ -57,7 +71,28 @@ moving the `rfsuite` folder to a backup location **outside scripts**. Retain
 The older **rotorflight-wizard** System Tool is a separate script. This
 wizard appears inside **Create model**, not in the System Tools menu.
 
-## Create a model
+## Create a model: new Rotorflight category
+
+Use this flow when **Rotorflight** appears beside the built-in model types:
+
+1. Set **System > Sticks > First four channels fixed OFF**.
+2. Open **Model > Model select > + model tile > Create model > Rotorflight**.
+3. Confirm **First four fixed OFF**. Set **Use ELRS channel order ON** for
+   ELRS, or leave it OFF for the standard layout.
+4. Choose **Ignore blackbox** and **Ignore rescue** on this first page if you
+   do not need those functions. Their assignment pages will be skipped.
+5. Assign arm, throttle hold and all three rates/profile positions. Assign
+   blackbox and rescue only if enabled.
+6. Review the channel and switch assignments. Resolve any missing-assignment
+   message before pressing Next. There is no separate create toggle in this mode.
+7. Press **Next** to let Ethos invoke the final mix-generation callback, then
+   name and save the model. Invalid inputs are rejected before any mixes are
+   created; restart creation if a generation error is reported.
+
+All nine channel slots are created together, even when optional pages are
+skipped. CH8/CH9 stay at -100% when ignored.
+
+## Create a model: older firmware (including 26.1.2)
 
 1. Open **System > Sticks** and set **First four channels fixed OFF**.
 2. Open **Model > Model select**.
@@ -85,8 +120,9 @@ wizard appears inside **Create model**, not in the System Tools menu.
 Arm, throttle hold and any assigned rescue must use separate physical switches. CH7
 requires all three distinct positions of one physical three-position switch.
 
-Blackbox and rescue are optional. Ignoring either disables its switch picker
-and removes its switch requirement. CH8 and CH9 remain present at **-100%**
+Blackbox and rescue are optional. In the new category, choose Ignore on the
+first page to skip the assignment page. In the older flow, Ignore disables
+the picker on its own page. Either option removes that switch requirement. CH8 and CH9 remain present at **-100%**
 when ignored, so channel numbers stay fixed. The review shows **Ignored**.
 Turn Ignore OFF to restore its previous selection before creating the draft.
 
@@ -153,11 +189,12 @@ settings or configure radio stick rates.
 
 | Symptom | What to check |
 | --- | --- |
-| Wizard page is missing | Check the installation folder, restart Ethos and create a new model as **Other**. If the full suite's wizard integration is installed, the standalone copy defers to it. |
+| Wizard page is missing | Check the complete installation and restart Ethos. Select **Rotorflight** when available; otherwise select **Other**. If the full suite's wizard integration is installed, the standalone copy defers to it. |
+| Rotorflight category is missing on 26.1.2/26.2.0-RC1 | Expected: those versions lack `system.registerWizard()`. Use **Other**; the package selects the compatible flow automatically. |
 | Helicopter channel-order page appears | Restart creation and select **Other**. |
 | Outputs have the wrong channel numbers | Confirm **First four channels fixed OFF**, then restart creation as **Other**. |
 | Create control is disabled | Fill in arm, throttle hold and all three profile positions; assign blackbox/rescue or turn their Ignore options ON. Follow the message below the control. |
-| Saved model has no wizard mixes | Turn **Create reviewed CH1-CH9 ON** on the review page before continuing to the name screen. |
+| Saved model has no wizard mixes | In the older **Other** flow, turn **Create reviewed CH1-CH9 ON** before continuing. In the new category, complete a valid review and continue with **Next**. |
 | `cannot open ... model_wizard.lua` | Reinstall the complete current package under the exact folder name shown above. Clear the affected compiled caches and restart Ethos. |
 | Changes do not appear after an update | With the radio or simulator closed, remove `main.luac`, `lib/register_model_wizard.luac` and `app/lib/model_wizard.luac` if present. Keep the corresponding `.lua` files. Restart Ethos to recompile them. |
 
@@ -170,8 +207,9 @@ Run from the **Ethos RF Model Wizard** repository root:
 python package.py
 ```
 
-This rebuilds `rotorflight-model-wizard-standalone-en.zip` with the three
-Lua files, this README and the root `ethos_lua_manifest.json`. Compiled
+This regenerates the category icon from `assets/build_icon.py`, then rebuilds
+`rotorflight-model-wizard-standalone-en.zip` with the three Lua files, icon,
+this README and the root `ethos_lua_manifest.json`. Compiled
 Lua caches and tests are excluded. Python's standard library is sufficient.
 See `tests/README.md` for simulator validation instructions.
 
