@@ -58,7 +58,7 @@ return function(baseDir)
     else
         for _, page in ipairs(pages) do system.registerWizardPage(page) end
         system.registerSystemTool({
-            name = "", icon = icon,
+            name = "Model Wizard", icon = icon,
             create = function()
                 clearController()
                 active, pending = false, false
@@ -67,9 +67,9 @@ return function(baseDir)
                     form.addStaticText(form.addLine("", nil, false), {x = 0, y = 0, w = width - 16, h = 40}, value)
                 end
                 instruction("System > Sticks: First four channels fixed OFF.")
-                instruction("Press Create Rotorflight model below, then choose:")
+                instruction("Press Create Heli FBL Model below, then choose:")
                 instruction("Large + tile > Create model > Other.")
-                form.addTextButton(form.addLine(""), nil, "Create Rotorflight model", function()
+                form.addTextButton(form.addLine(""), nil, "Create Heli FBL Model", function()
                     pending = true
                     system.openPage({model = 0})
                 end)

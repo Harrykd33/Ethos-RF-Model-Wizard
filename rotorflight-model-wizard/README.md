@@ -1,16 +1,17 @@
 # Rotorflight Model Wizard
 
-A standalone Lua wizard that creates a nine-channel Rotorflight radio model
-through Ethos's built-in **Create model** flow. Choose the existing FrSky
-layout or an **ExpressLRS (ELRS)** layout on the first wizard page.
+A standalone Lua wizard that creates a Rotorflight or Heli FBL radio model
+through Ethos's built-in **Create model** flow. Choose **FrSky RF**, **ELRS RF** or
+**Heli FBL** from **Model type** on the first wizard page.
 
-It assigns arm, throttle hold, a shared rates/profile selector, blackbox and
-rescue. The full Rotorflight Lua suite, an internet connection and a connected
+Rotorflight assigns arm, throttle hold, a shared rates/profile selector, blackbox
+and rescue. Heli FBL assigns governor control, gyro gain, collective pitch, banks
+and rescue across eight channels. The full Rotorflight Lua suite, an internet connection and a connected
 flight controller are not required to create the model.
 
 ## Requirements
 
-- Ethos firmware supporting Lua wizard pages and mix creation. Tested with
+- Ethos firmware supporting Lua wizard pages, mix creation and (for Heli FBL) logic switch creation. Tested with
   X18RS simulators running **26.1.2** and **26.2.0-RC1**.
 - **System > Sticks > First four channels fixed** set to **OFF**.
 - Select the **Rotorflight** category when available, or **Other** on older firmware.
@@ -80,8 +81,8 @@ Use this flow when **Rotorflight** appears beside the built-in model types:
 
 1. Set **System > Sticks > First four channels fixed OFF**.
 2. Open **Model > Model select > + model tile > Create model > Rotorflight**.
-3. Confirm **First four fixed OFF**. Set **Use ELRS channel order ON** for
-   ELRS, or leave it OFF for the FrSky layout.
+3. Confirm **First four fixed OFF**. Select **FrSky RF**, **ELRS RF** or **Heli FBL**
+   under **Model type**. For Heli FBL, follow its compact setup below.
 4. Choose **Ignore blackbox** and **Ignore rescue** on this first page if you
    do not need those functions. Their assignment pages will be skipped.
 5. Assign arm, throttle hold and all three rates/profile positions. Assign
@@ -93,21 +94,23 @@ Use this flow when **Rotorflight** appears beside the built-in model types:
    Only the stick-setting instruction and switch-assignment note are displayed;
    validation messages remain hidden.
 
-All nine channel slots are created together, even when optional pages are
-skipped. CH8/CH9 stay at -100% when ignored.
+FrSky and ELRS create all nine channel slots together, even when optional pages
+are skipped. Their CH8/CH9 stay at -100% when ignored. Heli FBL creates eight
+channels using the map below.
 
 ## Create a model: older firmware (including 26.1.2)
 
 1. Open **System > Sticks** and set **First four channels fixed OFF**.
-2. Open **System** and select the **Model Wizard RF logo tile**. Scroll to the next System menu page
+2. Open **System** and select **Model Wizard**. Scroll to the next System menu page
    if needed. Its first page explains the stick setting and **Other** selection.
-   Press **Create Rotorflight model**.
+   Press **Create Heli FBL Model**.
 3. In Model select, select the large **+ model tile**, then **Create model**.
 4. Select **Other**. Selecting Heli supplies its own mixes and changes the
    resulting channel order. Older firmware cannot check this selection in Lua.
 5. Confirm **First four fixed OFF**. The redundant **Other model selected**
    and **Set up Rotorflight switches** options have been removed.
-6. Set **Use ELRS channel order ON** for ELRS, or leave it OFF for FrSky.
+6. Select **FrSky RF**, **ELRS RF** or **Heli FBL** under **Model type**.
+   For Heli FBL, follow its compact setup below.
 7. Assign arm (**CH5 ELRS / CH6 FrSky**) and throttle hold
    (**CH6 ELRS / CH3 FrSky**).
 8. Assign all three profile/rates switch positions for **CH7**.
@@ -136,7 +139,50 @@ Turn Ignore OFF to restore its previous selection before creating the draft.
 Assignments lock after draft generation. Restart model creation if you need
 to change them afterward or if generation reports an error.
 
-## FrSky channel map (ELRS option OFF)
+## Heli FBL setup
+
+The first page is **Create Heli FBL Model**. Choose **Heli FBL** under
+**Model type**; the other choices are **FrSky RF** and **ELRS RF**. The same
+preparation applies: first four channels fixed OFF, and select **Other** after
+the older System launcher.
+
+| Channel | Function |
+| --- | --- |
+| CH1 | Aileron / roll stick |
+| CH2 | Elevator / pitch stick |
+| CH3 | ESC governor speeds, or FBL governor run/hold |
+| CH4 | Rudder / yaw stick |
+| CH5 | Three switch-selected, editable gyro gains |
+| CH6 | Linear collective stick, independent of throttle hold |
+| CH7 | Bank/IdleUP 1/2/3: -100%, 0%, +100% |
+| CH8 | Rescue: -100% inactive, +100% active; -100% when ignored |
+
+The compact pages group **governor type, hold and rescue**, then **three gyro
+positions with gains**, and **Bank/IdleUP 1/2/3**. Assign the three bank/idle-up
+positions once. Under **Governor type**, choose:
+
+- **FBL gov: CH7 speeds**: the bank/idle-up switch selects the FBL's three
+  speeds on **CH7**. CH3 supplies +100% when running and -100% in throttle hold.
+  No separate governor-on switch assignment is required.
+- **ESC gov: CH3 speeds**: edit the three ESC speed percentages beside the
+  bank/idle-up assignments. Those same switch positions select the three
+  throttle commands on **CH3**, while CH7 retains its bank/idle-up mapping.
+  Throttle hold overrides every speed and sets CH3 to -100%.
+
+ESC values range from 0?100%: 0% produces radio output -100%, 50% produces 0%,
+and 100% produces +100%. Gyro gains are radio output percentages from -100% to
++100%. Speeds and gains start at zero; enter the values required by your ESC
+and FBL setup. Gyro and bank assignments may use the same three-position
+switch. Keep throttle hold independent of gyro and bank/idle-up. Rescue uses
+a separate switch. You can ignore rescue while retaining its inactive CH8.
+
+The bank/idle-up page leads directly to review. The older review uses
+**Create CH1-CH8**; the modern category uses native Next. FBL governor mode
+creates no logic switches. ESC governor mode creates four native logic switches
+starting at LS1 in the new Other model, enforcing hold without a background
+Lua task. CH9 is not created for Heli FBL.
+
+## FrSky channel map
 
 | Channel | Mix name | Function and output |
 | --- | --- | --- |
@@ -150,7 +196,7 @@ to change them afterward or if generation reports an error.
 | CH8 | RF Blackbox | +100% at the active position; -100% otherwise |
 | CH9 | RF Rescue | +100% at the active position; -100% otherwise |
 
-## ELRS channel map (ELRS option ON)
+## ELRS channel map
 
 | Channel | Mix name | Function and output |
 | --- | --- | --- |
@@ -196,8 +242,8 @@ settings or configure radio stick rates.
 
 | Symptom | What to check |
 | --- | --- |
-| Wizard page is missing | Check the complete installation and restart Ethos. Select **Rotorflight** when available; otherwise start from **System > Rotorflight Wizard > Create Rotorflight model**, then choose **Other**. If the full suite's wizard integration is installed, the standalone copy defers to it. |
-| Rotorflight category is missing on 26.1.2/26.2.0-RC1 | Expected: those versions lack `system.registerWizard()`. Use **System > Rotorflight Wizard > Create Rotorflight model**, then **Other**. |
+| Wizard page is missing | Check the complete installation and restart Ethos. Select **Rotorflight** when available; otherwise start from **System > Rotorflight Wizard > Create Heli FBL Model**, then choose **Other**. If the full suite's wizard integration is installed, the standalone copy defers to it. |
+| Rotorflight category is missing on 26.1.2/26.2.0-RC1 | Expected: those versions lack `system.registerWizard()`. Use **System > Rotorflight Wizard > Create Heli FBL Model**, then **Other**. |
 | Helicopter channel-order page appears | Restart creation and select **Other**. |
 | Outputs have the wrong channel numbers | Confirm **First four channels fixed OFF**, then restart creation as **Other**. |
 | Create control is disabled | Fill in arm, throttle hold and all three profile positions; assign blackbox/rescue or turn their Ignore options ON. No validation message is shown. Check the setup confirmations and unassigned fields. |
@@ -214,8 +260,8 @@ Run from the **Ethos RF Model Wizard** repository root:
 python package.py
 ```
 
-This regenerates the category icon from `assets/build_icon.py`, then rebuilds
-`rotorflight-model-wizard-standalone-en.zip` with the three Lua files, icon,
+This uses the checked-in logo masks and rebuilds
+`rotorflight-model-wizard-standalone-en.zip` with the three Lua files, both logo masks,
 this README and the root `ethos_lua_manifest.json`. Compiled
 Lua caches and tests are excluded. Python's standard library is sufficient.
 See `tests/README.md` for simulator validation instructions.
@@ -224,10 +270,12 @@ See `tests/README.md` for simulator validation instructions.
 
 GPLv3: <https://www.gnu.org/licenses/gpl-3.0.en.html>
 
-The older System tool uses the supplied Model Wizard RF Helicopter logo. The
-newer Rotorflight category keeps its existing icon. To regenerate the older
-icon, install Pillow and run `python assets/build_legacy_icon.py`. Normal ZIP
-packaging uses the checked-in mask and needs no image library.
+Both wizard versions use a helicopter-only glyph extracted from the supplied
+`Model Wizard Helicopter Icon.png`. The embedded frame, background and lettering
+are omitted. Ethos draws the tile border, background, label and theme colors,
+matching the other System icons. The older tool is named **Model Wizard**;
+the modern category keeps its **Rotorflight** name.
 
-The older System tile has no separate text label; the enlarged logo supplies
-its title. Select that logo to open the launcher.
+To regenerate both icon masks, install Pillow and run
+`python assets/build_icon.py`. Normal ZIP packaging uses the checked-in masks
+and needs no image library.

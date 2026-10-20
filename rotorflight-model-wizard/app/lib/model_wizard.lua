@@ -11,6 +11,19 @@ local ignored = {}
 local positions = {}
 local textWidth, textLimit
 local elrs = false
+local layout = 1
+local layoutChoices = {{"FrSky RF", 1}, {"ELRS RF", 2}, {"Heli FBL", 3}}
+local fblNames = {"Aileron", "Elevator", "Throttle", "Rudder", "Gyro Gain", "Collective", "Bank/IdleUP", "Rescue"}
+local throttleMode = 1
+local throttleChoices = {{"FBL gov: CH7 speeds", 1}, {"ESC gov: CH3 speeds", 2}}
+local speeds, gains = {0, 0, 0}, {0, 0, 0}
+local fblTitles = {[2] = "Create Heli FBL Model", [3] = "Heli FBL: Gyro gain", [4] = "Heli FBL: Bank / IdleUP"}
+local fblLabels = {
+    [2] = "Throttle hold (CH3)", [3] = "Bank/IdleUP 1 (CH7 -100%)",
+    [4] = "Bank/IdleUP 2 (CH7 0%)", [5] = "Bank/IdleUP 3 (CH7 +100%)",
+    [7] = "Rescue active (CH8)", [8] = "Gyro position 1 (CH5)",
+    [9] = "Gyro position 2 (CH5)", [10] = "Gyro position 3 (CH5)"
+}
 local channelNames = {
     "Aileron", "Elevator", "RF Throttle", "Rudder", "Pitch",
     "RF Arm", "RF Profile", "RF Blackbox", "RF Rescue"
@@ -21,12 +34,18 @@ local labels = {
     "Blackbox active (CH8)", "Rescue active (CH9)"
 }
 
-local titles = {"Rotorflight switch setup (Requirements)", "Arm", "Throttle hold", "Rates / profile", "Blackbox", "Rescue"}
+local titles = {"Create Heli FBL Model", "Arm", "Throttle hold", "Rates / profile", "Blackbox", "Rescue"}
 local reviewLabel = "CH6 Arm / CH3 Hold"
 local stickSummary = "CH1 Ail / CH2 Ele / CH4 Rud / CH5 Collective"
 
-local function selectLayout(value)
-    if elrs == value then return end
+local function selectLayout(selection)
+    if layout == selection then return end
+    if layout == 3 or selection == 3 then
+        for key in pairs(positions) do positions[key] = nil end
+        for key in pairs(ignored) do ignored[key] = nil end
+    end
+    layout = selection
+    local value = selection == 2
     elrs = value
     local arm, throttle = value and 5 or 6, value and 6 or 3
     labels[1] = "Armed position (CH" .. arm .. ")"
@@ -60,8 +79,8 @@ local function text(value, topOffset)
     end
 end
 
-local function switchField(index)
-    local field = form.addSwitchField(form.addLine(labels[index]), nil,
+local function switchField(index, line, rect)
+    local field = form.addSwitchField(line or form.addLine(layout == 3 and fblLabels[index] or labels[index]), rect,
         function() return positions[index] end,
         function(value)
             if attempted then return end
@@ -99,8 +118,35 @@ local function physicalSwitch(source)
     return math.floor(source:member() / 3)
 end
 
+local function validTriplet(first)
+    local a, b, c = positions[first], positions[first + 1], positions[first + 2]
+    if not a or not b or not c then return false end
+    return physicalSwitch(a) == physicalSwitch(b) and physicalSwitch(a) == physicalSwitch(c)
+        and a:member() ~= b:member() and a:member() ~= c:member() and b:member() ~= c:member()
+end
+
+local function physicalPosition(index)
+    local source = positions[index]
+    return source and source:category() == CATEGORY_SWITCH_POSITION and source:options() == 0
+end
+
 local function validAssignments()
     if not allocationConfirmed then return false end
+    if layout == 3 then
+        for i = 2, 10 do
+            local needed = i == 2 or i >= 3 and i <= 5 or i == 7 and not ignored[7]
+                or i >= 8
+            if needed and not physicalPosition(i) then return false end
+        end
+        if not validTriplet(3) or not validTriplet(8) then return false end
+        local hold = physicalSwitch(positions[2])
+        if hold == physicalSwitch(positions[3]) or hold == physicalSwitch(positions[8]) then return false end
+        if not ignored[7] then
+            local rescue = physicalSwitch(positions[7])
+            if rescue == hold or rescue == physicalSwitch(positions[3]) or rescue == physicalSwitch(positions[8]) then return false end
+        end
+        return throttleMode == 1 or type(model.createLogicSwitch) == "function"
+    end
     for i = 1, #labels do
         local source = positions[i]
         if not ignored[i] and (not source or source:category() ~= CATEGORY_SWITCH_POSITION or source:options() ~= 0) then
@@ -127,8 +173,10 @@ function wizard.close()
     for key in pairs(ignored) do ignored[key] = nil end
     enabled, reviewed, attempted, allocationConfirmed = false, false, false, false
     categoryMode = false
+    throttleMode = 1
+    for i = 1, 3 do speeds[i], gains[i] = 0, 0 end
     textWidth, textLimit = nil, nil
-    selectLayout(false)
+    selectLayout(1)
 end
 
 function wizard.startLegacy()
@@ -143,6 +191,7 @@ end
 
 function wizard.available(page)
     if not enabled then return false end
+    if layout == 3 then return page ~= 5 and page ~= 6 end
     if categoryMode then
         if page == 5 then return not ignored[6] end
         if page == 6 then return not ignored[7] end
@@ -150,12 +199,38 @@ function wizard.available(page)
     return true
 end
 
+local function valueSwitch(index, values, item, minimum)
+    local line = form.addLine(fblLabels[index])
+    local split = math.floor(textWidth * 0.52)
+    local valueWidth = math.min(124, math.floor(textWidth * 0.2))
+    switchField(index, line, {x = split, y = 0, w = textWidth - split - valueWidth - 24, h = 40})
+    local field = form.addNumberField(line, {x = textWidth - valueWidth - 8, y = 0, w = valueWidth, h = 40}, minimum, 100,
+        function() return values[item] end,
+        function(value)
+            if attempted then return end
+            values[item] = value; reviewed = false
+        end)
+    field:suffix("%")
+    field:enable(not attempted)
+end
+
+local function valuesText(values)
+    return values[1] .. "/" .. values[2] .. "/" .. values[3] .. "%"
+end
+
+local function positionsText(first)
+    return positionName(first) .. "/" .. positionName(first + 1) .. "/" .. positionName(first + 2)
+end
+
 function wizard.build(page)
     local width = lcd.getWindowSize()
     if width ~= textWidth then
         textWidth, textLimit = width, math.max(16, math.floor((width - 16) / 14))
     end
-    text(page == 7 and (elrs and "Rotorflight review: ELRS" or "Rotorflight review: FrSky") or titles[page], 12)
+    local title = page == 7 and (layout == 3 and "Heli FBL review" or elrs and "Rotorflight review: ELRS" or "Rotorflight review: FrSky")
+        or layout == 3 and fblTitles[page] or titles[page]
+    if layout == 3 and page == 4 and throttleMode == 2 then title = "ESC gov CH3 / Bank/IdleUP CH7" end
+    text(title, 12)
     if page > 1 and page < 7 then
         text("Click box and flip desired switch and switch direction.")
     end
@@ -169,17 +244,36 @@ function wizard.build(page)
                 allocationConfirmed = value; reviewed = false
             end)
         field:enable(not attempted)
-        field = form.addBooleanField(form.addLine("Use ELRS channel order"), nil,
-            function() return elrs end,
+        field = form.addChoiceField(form.addLine("Model type"), nil, layoutChoices,
+            function() return layout end,
             function(value)
                 if attempted then return end
                 selectLayout(value)
                 reviewed = false
             end)
         field:enable(not attempted)
-        if categoryMode then
+        if categoryMode and layout ~= 3 then
             optionalSwitch(6, "Ignore blackbox", true)
             optionalSwitch(7, "Ignore rescue", true)
+        end
+    elseif layout == 3 and page < 7 then
+        if page == 2 then
+            local field = form.addChoiceField(form.addLine("Governor type"), nil, throttleChoices,
+                function() return throttleMode end,
+                function(value)
+                    if attempted then return end
+                    throttleMode = value; reviewed = false
+                end)
+            field:enable(not attempted)
+            switchField(2)
+            optionalSwitch(7, "Ignore rescue")
+        elseif page == 3 then
+            for i = 1, 3 do valueSwitch(i + 7, gains, i, -100) end
+        elseif page == 4 then
+            for i = 3, 5 do
+                if throttleMode == 2 then valueSwitch(i, speeds, i - 2, 0)
+                else switchField(i) end
+            end
         end
     elseif page == 2 then
         switchField(1)
@@ -197,7 +291,7 @@ function wizard.build(page)
             if not attempted then reviewed = ready end
         elseif not attempted then
             local field
-            field = form.addBooleanField(form.addLine("Create CH1-CH9"), nil,
+            field = form.addBooleanField(form.addLine(layout == 3 and "Create CH1-CH8" or "Create CH1-CH9"), nil,
                 function() return reviewed end,
                 function(value)
                     if not value or attempted then return end
@@ -208,6 +302,13 @@ function wizard.build(page)
                 end)
             field:enable(ready)
         end
+        if layout == 3 then
+            text("CH1 Ail / CH2 Ele / CH4 Rud / CH6 Collective")
+            text("CH3 " .. (throttleMode == 1 and "FBL gov On" or "ESC gov: " .. valuesText(speeds)) .. " / Hold " .. positionName(2))
+            text("CH5 Gyro: " .. valuesText(gains) .. " / " .. positionsText(8))
+            reviewRow("CH7 Bank/IdleUP / CH8 Rescue", positionsText(3) .. " / " .. positionName(7))
+            return
+        end
         text(stickSummary)
         reviewRow(reviewLabel, positionName(1) .. " / " .. positionName(2))
         reviewRow("CH7 Rates / Profile", positionName(3) .. " / " .. positionName(4) .. " / " .. positionName(5))
@@ -216,7 +317,7 @@ function wizard.build(page)
 end
 
 local function addMix(index, spec)
-    spec.name = channelNames[index]
+    spec.name = layout == 3 and fblNames[index] or channelNames[index]
     model.createMix("free", spec)
     -- Native wizard output allocation is deferred until the model is saved.
     -- getChannel() here reads the active model, not the draft being built.
@@ -230,6 +331,41 @@ local function binary(index, source, active, inactive)
     addMix(index, {actions = {{action = "offset", condition = source, active = active, inactive = inactive}}})
 end
 
+local function selector(index, first, values)
+    addMix(index, {actions = {
+        {action = "offset", condition = positions[first], active = values[1], inactive = 0},
+        {action = "offset", condition = positions[first + 1], active = values[2], inactive = 0},
+        {action = "offset", condition = positions[first + 2], active = values[3], inactive = 0}
+    }})
+end
+
+local bankValues = {-100, 0, 100}
+local function fblThrottle()
+    if throttleMode == 1 then
+        -- The FBL selects its three speeds from CH7. CH3 is only run / hold.
+        binary(3, positions[2], -100, 100)
+        return
+    end
+    -- Native logical gates enforce hold independently of every governor position.
+    -- These persist in the new model; no Lua wakeup task is needed after creation.
+    local run = model.createLogicSwitch()
+    run:name("FBL Run"); run:func(LOGIC_SWITCH_FUNCTION_OR)
+    run:values({positions[2]}); run:negative(true)
+    -- Other starts with no logic switches. Use draft slot descriptors: name
+    -- lookup reads the active model and cannot resolve newly created switches.
+    local runSource = {category = CATEGORY_LOGIC_SWITCH, member = 0}
+    local actions = {{action = "offset", active = -100, inactive = -100}}
+    for i = 1, 3 do
+        local name = "FBL Gov " .. i
+        local gate = model.createLogicSwitch()
+        gate:name(name); gate:func(LOGIC_SWITCH_FUNCTION_AND)
+        gate:values({runSource, positions[i + 2]})
+        actions[#actions + 1] = {action = "offset", condition = {category = CATEGORY_LOGIC_SWITCH, member = i},
+            active = speeds[i] * 2, inactive = 0}
+    end
+    addMix(3, {actions = actions})
+end
+
 function wizard.run()
     if not enabled or attempted or not reviewed or not validAssignments() then return false end
     -- Free mixes are allocated in sequence; the API has no output-edit method.
@@ -238,6 +374,15 @@ function wizard.run()
     attempted = true
     stick(1, ANALOG_STICK_AILERON)
     stick(2, ANALOG_STICK_ELEVATOR)
+    if layout == 3 then
+        fblThrottle()
+        stick(4, ANALOG_STICK_RUDDER)
+        selector(5, 8, gains)
+        stick(6, ANALOG_STICK_THROTTLE)
+        selector(7, 3, bankValues)
+        binary(8, ignored[7] and nil or positions[7], ignored[7] and -100 or 100, -100)
+        return true
+    end
     -- Sequential free-mix allocation determines channel numbers.
     if elrs then stick(3, ANALOG_STICK_THROTTLE) else binary(3, positions[2], -100, 100) end
     stick(4, ANALOG_STICK_RUDDER)

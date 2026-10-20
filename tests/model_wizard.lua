@@ -26,6 +26,10 @@ local function field(label, _, get, set)
     return result
 end
 form.addSwitchField, form.addBooleanField = field, field
+form.addChoiceField = function(label, rect, choices, get, set)
+    assert(#choices == 3 and choices[1][1] == "FrSky RF" and choices[2][1] == "ELRS RF" and choices[3][1] == "Heli FBL", "Three model types")
+    return field(label, rect, get, set)
+end
 form.addTextButton = function(_, _, label, press)
     fields[label] = {press = press}
 end
@@ -61,7 +65,7 @@ local function launch()
     tool.create()
     assert(texts["System > Sticks: First four channels fixed OFF."] and texts["Large + tile > Create model > Other."], "Legacy launch instructions")
     allHidden() -- Opening and cancelling the tool must not arm a session.
-    fields["Create Rotorflight model"].press()
+    fields["Create Heli FBL Model"].press()
     assert(opened and opened.model == 0, "Tool opens model selection")
     descriptors[1].init() -- Consume activation once when native creation starts.
     assert(descriptors[1].available(), "Explicit launch exposes setup")
@@ -69,7 +73,7 @@ local function launch()
 end
 register()
 assert(#descriptors == 7 and loads == 0 and masks == 1 and tools == 1, "Lazy legacy registration")
-assert(tool.name == "", "Logo supplies the legacy tile title")
+assert(tool.name == "Model Wizard", "Ethos supplies the tile title")
 descriptors[1].init()
 allHidden()
 descriptors[1].build()
@@ -78,13 +82,13 @@ launch()
 assert(loads == 1 and lastControllerPath == "SCRIPTS:/rfsuite/app/lib/model_wizard.lua", "Suite absolute path")
 assert(not fields["Other model selected"] and not fields["Set up Rotorflight switches"], "No redundant opt-ins")
 for page = 2, 7 do assert(descriptors[page].available(), "Explicit setup page available") end
-fields["Use ELRS channel order"].set(true)
+fields["Model type"].set(2)
 descriptors[1].init()
 allHidden() -- Finishing or cancelling must not activate the next normal wizard.
 descriptors[1].build()
 assert(loads == 1, "Next normal wizard stays lazy")
 launch()
-assert(loads == 2 and not fields["Use ELRS channel order"].get(), "Explicit relaunch resets selections")
+assert(loads == 2 and fields["Model type"].get() == 1, "Explicit relaunch resets selections")
 tool.create()
 descriptors[1].init()
 allHidden() -- Cancelled launcher without a button press does not authorize creation.
@@ -115,7 +119,7 @@ assert(not category[6].available() and category[7].available(), "Skip rescue, re
 assert(category[7].run() == false, "Invalid category draft rejected before creation")
 category[1].init()
 category[1].build()
-assert(category[5].available() and category[6].available() and not fields["Use ELRS channel order"].get(), "Category restart resets options")
+assert(category[5].available() and category[6].available() and fields["Model type"].get() == 1, "Category restart resets options")
 assert(masks == beforeMasks + 1, "Mask loaded once per registration")
 system.registerWizard, lcd.loadMask, loadfile = nativeCategory, nativeMask, nativeLoadfile
 system.registerWizardPage, system.registerSystemTool, system.openPage = nativeRegister, nativeTool, nativeOpen
@@ -141,10 +145,10 @@ else
 end
 assert(wizard.run() == false, "Allocation preparation must be confirmed")
 set("First four fixed OFF", true)
-assert(not fields["Use ELRS channel order"].get(), "FrSky layout by default")
-set("Use ELRS channel order", true)
-set("Use ELRS channel order", false)
-set("Use ELRS channel order", TEST_ELRS == true)
+assert(fields["Model type"].get() == 1, "FrSky layout by default")
+set("Model type", 2)
+set("Model type", 1)
+set("Model type", TEST_ELRS and 2 or 1)
 assert(wizard.run() == false, "Missing switch assignments")
 for page = 2, 6 do wizard.build(page) end
 set(armLabel, position(0))
@@ -224,9 +228,9 @@ wizard.build(2)
 assert(fields[armLabel].get():member() == 0, "Back retains assignments")
 assert(fields[armLabel].enabled == false, "Generated assignment locked")
 wizard.build(1)
-assert(not fields["Use ELRS channel order"].enabled, "Generated layout locked")
-set("Use ELRS channel order", not TEST_ELRS)
-assert(fields["Use ELRS channel order"].get() == (TEST_ELRS == true), "Locked layout rejects mutation")
+assert(not fields["Model type"].enabled, "Generated layout locked")
+set("Model type", TEST_ELRS and 1 or 2)
+assert(fields["Model type"].get() == (TEST_ELRS and 2 or 1), "Locked layout rejects mutation")
 set(armLabel, position(2))
 assert(fields[armLabel].get():member() == 0, "Locked assignment rejects mutation")
 wizard.build(5)
@@ -280,10 +284,10 @@ if TEST_IGNORE_RESCUE then assert(output(9) == -1024, "Ignored rescue after relo
 wizard.close()
 assert(not wizard.available(), "Cleanup")
 form = {addLine = function(label) return label end, addStaticText = function() end,
-    addSwitchField = field, addBooleanField = field}
+    addSwitchField = field, addBooleanField = field, addChoiceField = function(label, rect, choices, get, set) return field(label, rect, get, set) end}
 lcd.getWindowSize = function() return 800, 480 end
 wizard.build(1)
-assert(not fields["Use ELRS channel order"].get(), "Cleanup resets layout")
+assert(fields["Model type"].get() == 1, "Cleanup resets layout")
 wizard.build(5)
 wizard.build(6)
 assert(not fields["Ignore blackbox"].get() and not fields["Ignore rescue"].get(), "Cleanup resets ignore flags")

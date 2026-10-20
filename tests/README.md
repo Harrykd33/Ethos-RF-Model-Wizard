@@ -141,3 +141,76 @@ creation/cancellation flows passed. ZIP manifest validation also passed.
 Verified the label-free, enlarged logo in the real 26.1.2 System menu.
 The complete artwork fits inside its tile. The native launcher cancellation
 flow still passes. Modern category naming and icon remain unchanged.
+
+## Heli FBL (0.7.0)
+
+`heli_fbl.lua` runs in a disposable blank X18RS simulator with first-four-fixed
+OFF, production controller at `/controller.lua`, and TEST_CATEGORY, TEST_ESC,
+TEST_IGNORE_RESCUE, TEST_SHARED flags. It tests both governor modes in legacy
+and category controller flows, rejected duplicate/unsafe switch assignments,
+162 switch combinations per configuration, custom gains and speeds, shared
+gyro/bank switches, ignored rescue, linear sticks and save/reload. All eight
+FBL cases passed; all 16 FrSky/ELRS regression configurations also passed.
+
+Two native 26.1.2 Other-model creation flows passed for FBL and ESC governors.
+They saved exactly CH1-CH8, exercised throttle hold and governor run, reloaded
+the saved model, then created a normal Plane without Rotorflight pages. These
+use scratch-only assignment fixtures; production files do not preassign
+switches. Screenshots verified the compact hold/rescue, gyro/value, bank,
+governor/value and review pages fit above navigation controls.
+
+The native draft tests caught that named source lookup resolves the active
+model rather than newly created draft logical switches. Production governor
+gates reference LS1 onward with category/member descriptors. Keep native draft
+creation checks when changing these references; live-model tests alone do not
+exercise that distinction. The modern category API remains shim-tested.
+
+## Shared bank/idle-up governor control (0.7.1)
+
+Model type choices are FrSky RF, ELRS RF and Heli FBL. The first page and
+Heli FBL governor/hold page use Create Heli FBL Model. Bank/IdleUP 1/2/3
+selects CH7 (-100/0/+100). ESC governor throttle values stay on CH3 and use
+those same physical bank positions. FBL governor uses CH7 for speed selection
+and CH3 for hold/run without a separate governor-on assignment or logic switch.
+The two redundant governor assignment pages are skipped in both controller modes.
+
+All 24 controller configurations passed (16 RF/ELRS and 8 Heli FBL), including
+mode changes that retain the bank assignments, ignored rescue, shared gyro/bank,
+162 switch combinations per FBL case, hold overrides and persistence. FBL tests
+leave the old governor-on and separate ESC speed positions unset and also create
+a valid FBL model with createLogicSwitch unavailable. Native 26.1.2 Other-model
+creation passed for both governor modes, saved CH1-CH8, verified hold/run on
+reload and completed a following normal Plane wizard without RF pages leaking.
+Screenshots verified requirements, governor/hold, gyro, bank/idle-up and review.
+
+## Launcher wording and shared logo (0.7.2)
+
+The legacy launch instruction and button now say Create Heli FBL Model. Both
+icon assets come from Model Wizard Helicopter Logo.png, resized as grayscale
+masks for the legacy tile and modern category. Packaging uses the checked-in
+masks and no longer regenerates an unrelated category symbol.
+
+The 26.1.2 native launcher/Other creation/save-reload flow passed, followed by
+normal model creation. Registration tests passed for both legacy and modern
+API-shim paths with the new masks. Native screenshots verified the complete
+System logo and launcher wording. Real modern category rendering still needs
+firmware with registerWizard; its registration/mask loading was shim-tested.
+
+## Framed helicopter icon (0.7.3)
+
+Both icon masks now derive from Model Wizard Helicopter Icon.png, including
+its rounded frame, title and helicopter. Empty outer black margins are removed;
+the artwork is inverted into Ethos mask polarity and resized for each tile.
+The native 26.1.2 System menu displays the complete framed icon with theme
+colors. Native creation/save-reload and legacy/modern registration-shim tests
+passed using the new production masks.
+
+## Native Ethos tile styling (0.7.4)
+
+Both icon assets now contain only the helicopter glyph as an 8-bit grayscale
+mask. The original embedded frame, title and dark panel are omitted, and the
+legacy tool name is Model Wizard so Ethos draws the caption and tile chrome.
+The native 26.1.2 menu was visually checked with the icon selected and unselected:
+Ethos supplies black/orange and white/dark appearances respectively. The native
+launcher/creation/reload flow and both registration paths passed; modern
+registration still uses the API shim.

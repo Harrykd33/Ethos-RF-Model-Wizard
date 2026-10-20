@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "name": "Rotorflight Model Wizard",
   "key": "org.rotorflight.ethos-model-wizard",
-  "version": "0.6.2",
+  "version": "0.7.5",
   "folder": "rotorflight-model-wizard",
   "files": [
     "rotorflight-model-wizard/**"
