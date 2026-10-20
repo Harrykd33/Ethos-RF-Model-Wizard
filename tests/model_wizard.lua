@@ -1,4 +1,4 @@
--- Run with TEST_ELRS=true for the ELRS layout; false/nil tests standard.
+-- Run with TEST_ELRS=true for the ELRS layout; false/nil tests FrSky.
 -- Disposable X18RS Ethos 26.1.2 / 26.2.0-RC1 simulator ONLY. This changes scratch
 -- radio settings and creates mixes. Stage translated /controller.lua and
 -- /register.lua. The factory workspace must have no existing mixes.
@@ -26,13 +26,25 @@ local function field(label, _, get, set)
     return result
 end
 form.addSwitchField, form.addBooleanField = field, field
-local nativeRegister, nativeLoadfile = system.registerWizardPage, loadfile
-local descriptors, loads = {}, 0
-local lastControllerPath
+form.addTextButton = function(_, _, label, press)
+    fields[label] = {press = press}
+end
+local nativeRegister, nativeTool, nativeOpen = system.registerWizardPage, system.registerSystemTool, system.openPage
+local nativeCategory, nativeMask, nativeLoadfile = system.registerWizard, lcd.loadMask, loadfile
+local descriptors, loads, masks, tools = {}, 0, 0, 0
+local tool, lastControllerPath, opened
 local register = assert(nativeLoadfile("/register.lua"))()
 system.registerWizardPage = nil
 register()
 system.registerWizardPage = function(value) descriptors[#descriptors + 1] = value end
+system.registerSystemTool = function(value) tool = value; tools = tools + 1; return 9 end
+system.openPage = function(value) opened = value end
+lcd.loadMask = function(path)
+    local expected = system.registerWizard and "/icon.png" or "/legacy-icon.png"
+    assert(path == "SCRIPTS:/rfsuite" .. expected or path == "SCRIPTS:/rotorflight-model-wizard" .. expected, "Mode-specific absolute icon path")
+    masks = masks + 1
+    return nativeMask(expected)
+end
 loadfile = function(path, ...)
     if path == "SCRIPTS:/rfsuite/app/lib/model_wizard.lua"
         or path == "SCRIPTS:/rotorflight-model-wizard/app/lib/model_wizard.lua" then
@@ -42,45 +54,56 @@ loadfile = function(path, ...)
     end
     return nativeLoadfile(path, ...)
 end
+local function allHidden()
+    for page = 1, 7 do assert(not descriptors[page].available(), "Normal wizard must hide Rotorflight page " .. page) end
+end
+local function launch()
+    tool.create()
+    assert(texts["System > Sticks: First four channels fixed OFF."] and texts["Large + tile > Create model > Other."], "Legacy launch instructions")
+    allHidden() -- Opening and cancelling the tool must not arm a session.
+    fields["Create Rotorflight model"].press()
+    assert(opened and opened.model == 0, "Tool opens model selection")
+    descriptors[1].init() -- Consume activation once when native creation starts.
+    assert(descriptors[1].available(), "Explicit launch exposes setup")
+    descriptors[1].build()
+end
 register()
-assert(#descriptors == 7 and loads == 0, "Lazy registration")
-assert(descriptors[1].available() and not descriptors[2].available())
-descriptors[1].build()
-fields["Use ELRS channel order"].set(true)
-assert(loads == 1 and descriptors[2].available(), "ELRS selection enables setup pages")
-assert(fields["Set up Rotorflight switches"].get(), "Setup toggle reflects ELRS selection")
-for page = 2, 7 do assert(descriptors[page].available(), "ELRS page available " .. page) end
-fields["Set up Rotorflight switches"].set(false)
-assert(not descriptors[2].available() and not fields["Use ELRS channel order"].get(), "Disable clears ELRS selection")
-fields["Set up Rotorflight switches"].set(true)
-assert(descriptors[2].available(), "Standard setup remains available")
+assert(#descriptors == 7 and loads == 0 and masks == 1 and tools == 1, "Lazy legacy registration")
+assert(tool.name == "", "Logo supplies the legacy tile title")
 descriptors[1].init()
-assert(not descriptors[2].available(), "New-session reset")
+allHidden()
 descriptors[1].build()
-assert(loads == 2 and not descriptors[2].available())
-assert(lastControllerPath == "SCRIPTS:/rfsuite/app/lib/model_wizard.lua", "Suite callback must use an absolute path")
+assert(loads == 0, "Hidden pages cannot load the controller")
+launch()
+assert(loads == 1 and lastControllerPath == "SCRIPTS:/rfsuite/app/lib/model_wizard.lua", "Suite absolute path")
+assert(not fields["Other model selected"] and not fields["Set up Rotorflight switches"], "No redundant opt-ins")
+for page = 2, 7 do assert(descriptors[page].available(), "Explicit setup page available") end
+fields["Use ELRS channel order"].set(true)
+descriptors[1].init()
+allHidden() -- Finishing or cancelling must not activate the next normal wizard.
+descriptors[1].build()
+assert(loads == 1, "Next normal wizard stays lazy")
+launch()
+assert(loads == 2 and not fields["Use ELRS channel order"].get(), "Explicit relaunch resets selections")
+tool.create()
+descriptors[1].init()
+allHidden() -- Cancelled launcher without a button press does not authorize creation.
 descriptors = {}
 register("SCRIPTS:/rotorflight-model-wizard")
-descriptors[1].build()
-assert(loads == 3 and #descriptors == 7)
-assert(lastControllerPath == "SCRIPTS:/rotorflight-model-wizard/app/lib/model_wizard.lua", "Standalone callback must use its absolute path")
--- Exercise the new registration contract even on firmware without RC2.
--- Only registration is shimmed; mask loading and the controller use real Lua APIs.
-local nativeCategoryRegister, nativeLoadMask = system.registerWizard, lcd.loadMask
-local category, maskLoads = nil, 0
+allHidden()
+launch()
+assert(loads == 3 and lastControllerPath == "SCRIPTS:/rotorflight-model-wizard/app/lib/model_wizard.lua", "Standalone absolute path")
+
+-- New firmware uses only its own category, never the legacy launcher.
+local category
 system.registerWizardPage = nil
 system.registerWizard = function(name, icon, pages)
     assert(name == "Rotorflight" and icon and #pages == 7, "Category registration")
     category = pages
 end
-lcd.loadMask = function(path)
-    assert(path == "SCRIPTS:/rotorflight-model-wizard/icon.png", "Absolute icon path")
-    maskLoads = maskLoads + 1
-    return nativeLoadMask("/icon.png")
-end
-local beforeLoads = loads
+local beforeLoads, beforeMasks, beforeTools = loads, masks, tools
 register("SCRIPTS:/rotorflight-model-wizard")
-assert(category and loads == beforeLoads and maskLoads == 1, "Category registration remains lazy")
+assert(category and loads == beforeLoads and masks == beforeMasks + 1 and tools == beforeTools, "Lazy category without a legacy tool")
 for key in pairs(fields) do fields[key] = nil end
 category[1].build()
 assert(loads == beforeLoads + 1 and category[2].available(), "Selecting category starts setup")
@@ -89,13 +112,13 @@ fields["Ignore blackbox"].set(true)
 assert(not category[5].available() and category[6].available() and category[7].available(), "Skip blackbox page only")
 fields["Ignore rescue"].set(true)
 assert(not category[6].available() and category[7].available(), "Skip rescue, retain centralized final run")
-assert(not pcall(category[7].run), "Invalid category draft rejected before creation")
+assert(category[7].run() == false, "Invalid category draft rejected before creation")
 category[1].init()
 category[1].build()
 assert(category[5].available() and category[6].available() and not fields["Use ELRS channel order"].get(), "Category restart resets options")
-assert(maskLoads == 1, "Mask loaded once at registration")
-system.registerWizard, lcd.loadMask = nativeCategoryRegister, nativeLoadMask
-system.registerWizardPage, loadfile = nativeRegister, nativeLoadfile
+assert(masks == beforeMasks + 1, "Mask loaded once per registration")
+system.registerWizard, lcd.loadMask, loadfile = nativeCategory, nativeMask, nativeLoadfile
+system.registerWizardPage, system.registerSystemTool, system.openPage = nativeRegister, nativeTool, nativeOpen
 
 local wizard = assert(loadfile("/controller.lua"))()
 local function set(label, value) assert(fields[label], label).set(value) end
@@ -112,18 +135,17 @@ if TEST_CATEGORY then
     wizard.build(1)
     assert(wizard.available() and not fields["Other model selected"] and not fields["Set up Rotorflight switches"], "Category starts enabled")
 else
+    wizard.startLegacy()
     wizard.build(1)
-    set("Set up Rotorflight switches", true)
-    assert(not pcall(wizard.run), "Preparation must be confirmed")
-    set("Other model selected", true)
+    assert(wizard.available() and not fields["Other model selected"] and not fields["Set up Rotorflight switches"], "Legacy launch starts enabled")
 end
-assert(not pcall(wizard.run), "Allocation preparation must be confirmed")
+assert(wizard.run() == false, "Allocation preparation must be confirmed")
 set("First four fixed OFF", true)
-assert(not fields["Use ELRS channel order"].get(), "Standard layout by default")
+assert(not fields["Use ELRS channel order"].get(), "FrSky layout by default")
 set("Use ELRS channel order", true)
 set("Use ELRS channel order", false)
 set("Use ELRS channel order", TEST_ELRS == true)
-assert(not pcall(wizard.run), "Missing switch assignments")
+assert(wizard.run() == false, "Missing switch assignments")
 for page = 2, 6 do wizard.build(page) end
 set(armLabel, position(0))
 set(holdLabel, position(3))
@@ -149,46 +171,48 @@ if TEST_IGNORE_BLACKBOX then set("Ignore blackbox", true)
 else set("Blackbox active (CH8)", position(9)) end
 if TEST_IGNORE_RESCUE then set("Ignore rescue", true)
 else set("Rescue active (CH9)", position(12)) end
-assert(not pcall(wizard.run), "Generation requires a completed review")
+assert(wizard.run() == false, "Generation requires a completed review")
 local function reviewReady(expected)
     for key in pairs(texts) do texts[key] = nil end
     wizard.build(7)
     if TEST_CATEGORY then
-        assert(not fields["Create reviewed CH1-CH9"], "Category uses native Next/run")
-        assert(texts[expected and "Next creates reviewed CH1-CH9." or "Complete required assignments before Next."], "Category review validity")
+        assert(not fields["Create CH1-CH9"], "Category uses native Next/run")
+        if not expected then assert(wizard.run() == false, "Incomplete category review cannot create mixes") end
     else
-        assert(fields["Create reviewed CH1-CH9"].enabled == expected, "Legacy review validity")
+        assert(fields["Create CH1-CH9"].enabled == expected, "Legacy review validity")
     end
 end
 reviewReady(true)
 if TEST_IGNORE_BLACKBOX then
     set("Ignore blackbox", false)
     reviewReady(false)
-    assert(not pcall(wizard.run), "Blackbox required again when restored")
+    assert(wizard.run() == false, "Blackbox required again when restored")
     set("Ignore blackbox", true)
     wizard.build(7)
 end
 if TEST_IGNORE_RESCUE then
     set("Ignore rescue", false)
     reviewReady(false)
-    assert(not pcall(wizard.run), "Rescue required again when restored")
+    assert(wizard.run() == false, "Rescue required again when restored")
     set("Rescue active (CH9)", position(0))
     reviewReady(false)
-    assert(not pcall(wizard.run), "Active rescue cannot share arm switch")
+    assert(wizard.run() == false, "Active rescue cannot share arm switch")
     set("Ignore rescue", true)
     reviewReady(true) -- An ignored rescue may retain an unused colliding selection.
     set("Rescue active (CH9)", nil)
 end
-if not TEST_CATEGORY then assert(not pcall(wizard.run), "Review must be confirmed") end
+if not TEST_CATEGORY then assert(wizard.run() == false, "Review must be confirmed") end
 set("Profile 2 (CH7 0%)", position(6))
-assert(not pcall(wizard.run), "Duplicated profile position")
+reviewReady(false)
+assert(wizard.run() == false, "Duplicated profile position")
 set("Profile 2 (CH7 0%)", position(7))
 set(holdLabel, position(2))
-assert(not pcall(wizard.run), "Arm and hold must be independent")
+reviewReady(false)
+assert(wizard.run() == false, "Arm and hold must be independent")
 set(holdLabel, position(3))
 reviewReady(true)
 if TEST_CATEGORY then wizard.run() -- Native final-page callback generates all channels.
-else set("Create reviewed CH1-CH9", true) end -- Legacy Other requires explicit generation.
+else set("Create CH1-CH9", true) end -- Legacy Other requires explicit generation.
 model.dirty() -- The macro uses a live test model; native creation saves its draft.
 wizard.run()
 local names = TEST_ELRS
@@ -265,4 +289,4 @@ wizard.build(6)
 assert(not fields["Ignore blackbox"].get() and not fields["Ignore rescue"].get(), "Cleanup resets ignore flags")
 lcd.getWindowSize = nativeWindowSize
 form = nativeForm
-print((TEST_CATEGORY and "Category " or "Legacy ") .. (TEST_ELRS and "ELRS " or "Standard ") .. "PASS: nine exact channels, 48 switch combinations, sticks, save/reload, validation, optional switches and cleanup")
+print((TEST_CATEGORY and "Category " or "Legacy ") .. (TEST_ELRS and "ELRS " or "FrSky ") .. "PASS: nine exact channels, 48 switch combinations, sticks, save/reload, validation, optional switches and cleanup")

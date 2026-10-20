@@ -3,36 +3,40 @@
   GPLv3 -- https://www.gnu.org/licenses/gpl-3.0.en.html
 ]] --
 
--- Keep the form implementation out of memory until model creation uses it.
 return function(baseDir)
     local categoryMode = type(system.registerWizard) == "function"
-    if not model.createMix or (not categoryMode and not system.registerWizardPage) then return end
+    if not model.createMix then return end
+    if not categoryMode and (not system.registerWizardPage or not system.registerSystemTool or not system.openPage) then return end
     baseDir = baseDir or "SCRIPTS:/rfsuite"
     local controller
-    -- Deferred wizard callbacks do not reliably retain main.lua's directory.
-    -- SCRIPTS: resolves on both physical RADIO: storage and the simulator.
+    local pending, active = false, false
     local controllerPath = baseDir .. "/app/lib/model_wizard.lua"
+
+    local function clearController()
+        if controller then controller.close(); controller = nil end
+    end
 
     local function getController()
         if not controller then
             controller = assert(loadfile(controllerPath))()
-            if categoryMode then controller.startCategory() end
+            if categoryMode then controller.startCategory() else controller.startLegacy() end
         end
         return controller
     end
 
     local function reset()
-        if controller then controller.close(); controller = nil end
+        clearController()
+        -- Each explicit legacy launch authorizes one native creation session.
+        if not categoryMode then active, pending = pending, false end
     end
 
     local function available(page)
-        return controller ~= nil and controller.available(page)
+        if not categoryMode and not active and not pending then return false end
+        return page == 1 or controller ~= nil and controller.available(page)
     end
 
     local function run()
-        -- Ethos calls this when creating the draft mixes. Keep the selections
-        -- and generation lock for native Back navigation.
-        if controller then controller.run() end
+        return (categoryMode or active) and controller ~= nil and controller.run()
     end
 
     local pages = {}
@@ -40,16 +44,36 @@ return function(baseDir)
         local page = index
         pages[index] = {
             init = page == 1 and reset or nil,
-            available = page == 1 and function() return true end or function() return available(page) end,
-            build = function() getController().build(page) end,
+            available = function() return available(page) end,
+            build = function()
+                if available(page) then getController().build(page) end
+            end,
             run = page == 7 and run or nil
         }
     end
+    local iconPath = categoryMode and "/icon.png" or "/legacy-icon.png"
+    local icon = assert(lcd.loadMask(baseDir .. iconPath), "Rotorflight wizard icon missing")
     if categoryMode then
-        -- A single cached mask; no render/wakeup allocations or image loads.
-        local icon = assert(lcd.loadMask(baseDir .. "/icon.png"), "Rotorflight wizard icon missing")
         system.registerWizard("Rotorflight", icon, pages)
     else
         for _, page in ipairs(pages) do system.registerWizardPage(page) end
+        system.registerSystemTool({
+            name = "", icon = icon,
+            create = function()
+                clearController()
+                active, pending = false, false
+                local width = lcd.getWindowSize()
+                local function instruction(value)
+                    form.addStaticText(form.addLine("", nil, false), {x = 0, y = 0, w = width - 16, h = 40}, value)
+                end
+                instruction("System > Sticks: First four channels fixed OFF.")
+                instruction("Press Create Rotorflight model below, then choose:")
+                instruction("Large + tile > Create model > Other.")
+                form.addTextButton(form.addLine(""), nil, "Create Rotorflight model", function()
+                    pending = true
+                    system.openPage({model = 0})
+                end)
+            end
+        })
     end
 end

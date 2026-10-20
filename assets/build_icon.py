@@ -28,9 +28,9 @@ def main():
         for x in range(SIZE):
             ellipse = ((x - 33) / 13) ** 2 + ((y - 31) / 11) ** 2
             on = 0.75 <= ellipse <= 1.25 or any(near_line(x, y, line) for line in LINES)
-            rows.extend((255, 255, 255, 255) if on else (0, 0, 0, 0))
+            rows.append(0 if on else 255)
     png = b"\x89PNG\r\n\x1a\n"
-    png += chunk(b"IHDR", struct.pack(">IIBBBBB", SIZE, SIZE, 8, 6, 0, 0, 0))
+    png += chunk(b"IHDR", struct.pack(">IIBBBBB", SIZE, SIZE, 8, 0, 0, 0, 0))
     png += chunk(b"IDAT", zlib.compress(bytes(rows))) + chunk(b"IEND", b"")
     target = Path(__file__).resolve().parents[1] / "rotorflight-model-wizard/icon.png"
     target.write_bytes(png)

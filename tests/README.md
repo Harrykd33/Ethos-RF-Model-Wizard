@@ -71,3 +71,73 @@ select the Rotorflight tile; verify both layouts, each optional-page
 combination, invalid inputs, review -> Next -> name -> save, Back navigation,
 cancel/restart, and exact CH1-CH9 with ignored channels at -100%. Confirm
 that native run happens after the review and runs only once per draft.
+
+## Cleanup (0.5.2)
+
+Instructional prompts, status text and input-validation messages are removed.
+Required setup fields and internal checks remain. Invalid run calls return
+false without creating mixes or displaying a Lua validation error. The legacy
+Create CH1-CH9 control remains disabled until inputs are valid.
+
+Channel names share one table; the ELRS selector updates the three differing
+slots in place. Selected-layout labels are refreshed only when that choice
+changes. Page builds read screen dimensions once, and short text avoids the
+wrapping/substitution path. No wakeup/paint callbacks or logging were added.
+
+The final 0.5.2 checks passed all 16 mode/layout/ignore variants (768 switch
+combinations), saved both legacy layouts through the real simulator UI, and
+visually verified message-free review pages, optional-page skipping and title
+spacing. Actual RC2 category integration remains pending as documented above.
+
+In an isolated 26.1.2 Lua benchmark using mock form fields and the same five
+page-build sequence, incremental retained Lua memory fell from about 17.68 KiB
+(0.5.1) to 16.52 KiB after GC. Screen-size queries fell from 10 to 5. These
+figures describe that controller/fixture sequence, not total radio RAM or FPS.
+
+## Instructions (0.5.3)
+
+Restored the System > Sticks / first-four-fixed-OFF instruction on setup and
+the requested click-box / flip-switch note on pages 2-6. Validation messages
+remain hidden. The real 26.1.2 native ELRS flow saved exact CH1-CH9; setup
+and the three-profile-field page were visually checked for fit.
+
+## Explicit legacy launcher (0.6.0)
+
+The Other-model confirmation and legacy setup opt-in have been removed.
+The legacy controller starts only after an explicit launcher activation.
+Registration tests capture registerSystemTool/openPage and check that every
+page is hidden before launch, activation is consumed by the next wizard init,
+normal creation cannot load the controller, opening the tool without pressing
+its button does not arm creation, and relaunch resets selections. New firmware
+registers only its category, with no legacy launcher.
+
+All 16 channel/controller variants passed on 26.1.2. Ten native UI cases also
+passed: normal Plane, Glider, Heli and Other creation with zero Rotorflight
+page builds/controller loads; explicit standard/ELRS creation with assigned
+and ignored optional channels, each followed by clean normal creation; cancel
+from the launcher; and cancel from active Rotorflight creation. Both layouts
+retained exact CH1-CH9. Native category testing on supporting RC2 firmware
+remains pending as described above.
+
+The actual legacy UI path is System > Rotorflight Wizard > Create Rotorflight
+model, then Model select > + > Create model > Other. A macro must use the real
+System-menu button to enter the Lua tool: directly calling openPage(toolIndex)
+from a 26.1.2 macro changes its Lua execution context, preventing later macro
+sleep calls. Production navigation uses the standard native button event path.
+
+## Legacy logo and instructions (0.6.1)
+
+The older System tool uses the supplied logo as a grayscale PNG mask. Its
+launch page shows the stick setting and large + tile > Create model > Other
+instructions above the button. Simulator screenshots confirmed both fit.
+Both controller modes now display FrSky in place of Standard.
+
+All 16 controller configurations (768 switch combinations) passed on 26.1.2,
+with the category API shim for modern registration. All ten native legacy
+creation/cancellation flows passed. ZIP manifest validation also passed.
+
+## Logo-only System tile (0.6.2)
+
+Verified the label-free, enlarged logo in the real 26.1.2 System menu.
+The complete artwork fits inside its tile. The native launcher cancellation
+flow still passes. Modern category naming and icon remain unchanged.

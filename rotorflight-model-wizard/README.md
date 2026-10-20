@@ -1,7 +1,7 @@
 # Rotorflight Model Wizard
 
 A standalone Lua wizard that creates a nine-channel Rotorflight radio model
-through Ethos's built-in **Create model** flow. Choose the existing standard
+through Ethos's built-in **Create model** flow. Choose the existing FrSky
 layout or an **ExpressLRS (ELRS)** layout on the first wizard page.
 
 It assigns arm, throttle hold, a shared rates/profile selector, blackbox and
@@ -16,8 +16,9 @@ flight controller are not required to create the model.
 - Select the **Rotorflight** category when available, or **Other** on older firmware.
 
 The package detects `system.registerWizard()` at startup. Supporting firmware
-gets a dedicated **Rotorflight** category; older firmware automatically uses
-the existing wizard pages under **Other**. The new API was announced for
+gets a dedicated **Rotorflight** category. Older firmware gets a **Rotorflight
+Wizard** System tool: its launch button activates the setup pages for one
+creation session. Normal model creation keeps those pages hidden. The new API was announced for
 **26.2.0-RC2**. The 26.1.2 and 26.2.0-RC1 simulators do not provide it.
 
 The **First four channels fixed OFF** checkbox confirms your manual stick
@@ -47,6 +48,7 @@ scripts/
   rotorflight-model-wizard/
     main.lua
     icon.png
+    legacy-icon.png
     README.md
     lib/
       register_model_wizard.lua
@@ -56,7 +58,7 @@ scripts/
 ```
 
 Keep the folder name **rotorflight-model-wizard** unchanged. Keep all three
-Lua files and `icon.png` together; copying only `main.lua` is insufficient. The script uses
+Lua files and both icon PNG files together; copying only `main.lua` is insufficient. The script uses
 absolute file paths so its later callbacks work on physical radios.
 
 ### Using it alongside the full suite
@@ -68,8 +70,9 @@ To run independently, close the simulator or power down the radio before
 moving the `rfsuite` folder to a backup location **outside scripts**. Retain
 `rfsuite.user`, your models and `radio.bin`.
 
-The older **rotorflight-wizard** System Tool is a separate script. This
-wizard appears inside **Create model**, not in the System Tools menu.
+The older **rotorflight-wizard** script is separate. This package creates a
+**Rotorflight Wizard** launcher on older firmware; supporting newer firmware
+shows its own **Rotorflight** category directly in **Create model**.
 
 ## Create a model: new Rotorflight category
 
@@ -78,16 +81,17 @@ Use this flow when **Rotorflight** appears beside the built-in model types:
 1. Set **System > Sticks > First four channels fixed OFF**.
 2. Open **Model > Model select > + model tile > Create model > Rotorflight**.
 3. Confirm **First four fixed OFF**. Set **Use ELRS channel order ON** for
-   ELRS, or leave it OFF for the standard layout.
+   ELRS, or leave it OFF for the FrSky layout.
 4. Choose **Ignore blackbox** and **Ignore rescue** on this first page if you
    do not need those functions. Their assignment pages will be skipped.
 5. Assign arm, throttle hold and all three rates/profile positions. Assign
    blackbox and rescue only if enabled.
-6. Review the channel and switch assignments. Resolve any missing-assignment
-   message before pressing Next. There is no separate create toggle in this mode.
+6. Review the channel and switch assignments. There is no separate create
+   toggle in this mode.
 7. Press **Next** to let Ethos invoke the final mix-generation callback, then
-   name and save the model. Invalid inputs are rejected before any mixes are
-   created; restart creation if a generation error is reported.
+   name and save the model. Incomplete assignments leave the draft unchanged.
+   Only the stick-setting instruction and switch-assignment note are displayed;
+   validation messages remain hidden.
 
 All nine channel slots are created together, even when optional pages are
 skipped. CH8/CH9 stay at -100% when ignored.
@@ -95,27 +99,30 @@ skipped. CH8/CH9 stay at -100% when ignored.
 ## Create a model: older firmware (including 26.1.2)
 
 1. Open **System > Sticks** and set **First four channels fixed OFF**.
-2. Open **Model > Model select**.
-3. Select the large **+ model tile**, then **Create model**. The small plus
-   beside the folder heading creates a folder.
-4. Select **Other**. Selecting **Heli** adds Ethos's own helicopter mixes
-   and changes the resulting channel order.
-5. On **Rotorflight switch setup**, confirm **Other model selected** and
-   **First four fixed OFF**, then enable **Set up Rotorflight switches**.
-6. Set **Use ELRS channel order ON** for ELRS, or leave it OFF for the
-   standard layout. Selecting ELRS also turns setup ON so the assignment pages
-   are available. Turning setup OFF clears the ELRS selection. RF module
-   settings are manual.
-7. Assign arm (**CH5 ELRS / CH6 standard**) and throttle hold
-   (**CH6 ELRS / CH3 standard**) on the next two pages.
-8. Assign the three positions of the shared rates/profile switch for **CH7**.
-9. Assign the blackbox-active position for **CH8**, or turn **Ignore blackbox ON**.
-10. Assign the rescue-active position for **CH9**, or turn **Ignore rescue ON**.
-11. Review the assignments and turn **Create reviewed CH1-CH9 ON** near the
-    top of the review page. It stays disabled until all required assignments
-    are valid; the message below it identifies what needs attention. Turning
-    it ON creates the draft mixes; do this before pressing Next.
-12. Continue to the model-name screen and finish saving the new model.
+2. Open **System** and select the **Model Wizard RF logo tile**. Scroll to the next System menu page
+   if needed. Its first page explains the stick setting and **Other** selection.
+   Press **Create Rotorflight model**.
+3. In Model select, select the large **+ model tile**, then **Create model**.
+4. Select **Other**. Selecting Heli supplies its own mixes and changes the
+   resulting channel order. Older firmware cannot check this selection in Lua.
+5. Confirm **First four fixed OFF**. The redundant **Other model selected**
+   and **Set up Rotorflight switches** options have been removed.
+6. Set **Use ELRS channel order ON** for ELRS, or leave it OFF for FrSky.
+7. Assign arm (**CH5 ELRS / CH6 FrSky**) and throttle hold
+   (**CH6 ELRS / CH3 FrSky**).
+8. Assign all three profile/rates switch positions for **CH7**.
+9. Assign blackbox on **CH8**, or turn **Ignore blackbox ON**.
+10. Assign rescue on **CH9**, or turn **Ignore rescue ON**.
+11. Review the assignments and turn **Create CH1-CH9 ON** before pressing
+    Next. It stays disabled until all required assignments are valid.
+12. Name and save the model, then check its mixes and channel monitor.
+
+The launch applies to the next model-creation session. Completing or cancelling
+that session does not activate later wizards. Opening the launcher without
+pressing its button does not activate anything. To clear a pending launch before
+starting creation, reopen the launcher and leave without pressing the button.
+
+Normal **Create model** flows remain unchanged when the launcher is not used.
 
 Arm, throttle hold and any assigned rescue must use separate physical switches. CH7
 requires all three distinct positions of one physical three-position switch.
@@ -129,7 +136,7 @@ Turn Ignore OFF to restore its previous selection before creating the draft.
 Assignments lock after draft generation. Restart model creation if you need
 to change them afterward or if generation reports an error.
 
-## Standard channel map (ELRS option OFF)
+## FrSky channel map (ELRS option OFF)
 
 | Channel | Mix name | Function and output |
 | --- | --- | --- |
@@ -165,7 +172,7 @@ blackbox and rescue keep their existing CH7/CH8/CH9 assignments.
 References: [Rotorflight ETHOS setup](https://rotorflight.org/docs/setup/radio-setup/radio-setup-ethos/ethos-generic-radio-setup)
 and [ExpressLRS switch configuration](https://www.expresslrs.org/software/switch-config/).
 
-Throttle (**CH3 standard / CH6 ELRS**) supplies a fixed command for the
+Throttle (**CH3 FrSky / CH6 ELRS**) supplies a fixed command for the
 **flight-controller governor**, rather than a throttle-stick curve for
 bypass operation. Collective remains independent of throttle hold.
 
@@ -189,12 +196,12 @@ settings or configure radio stick rates.
 
 | Symptom | What to check |
 | --- | --- |
-| Wizard page is missing | Check the complete installation and restart Ethos. Select **Rotorflight** when available; otherwise select **Other**. If the full suite's wizard integration is installed, the standalone copy defers to it. |
-| Rotorflight category is missing on 26.1.2/26.2.0-RC1 | Expected: those versions lack `system.registerWizard()`. Use **Other**; the package selects the compatible flow automatically. |
+| Wizard page is missing | Check the complete installation and restart Ethos. Select **Rotorflight** when available; otherwise start from **System > Rotorflight Wizard > Create Rotorflight model**, then choose **Other**. If the full suite's wizard integration is installed, the standalone copy defers to it. |
+| Rotorflight category is missing on 26.1.2/26.2.0-RC1 | Expected: those versions lack `system.registerWizard()`. Use **System > Rotorflight Wizard > Create Rotorflight model**, then **Other**. |
 | Helicopter channel-order page appears | Restart creation and select **Other**. |
 | Outputs have the wrong channel numbers | Confirm **First four channels fixed OFF**, then restart creation as **Other**. |
-| Create control is disabled | Fill in arm, throttle hold and all three profile positions; assign blackbox/rescue or turn their Ignore options ON. Follow the message below the control. |
-| Saved model has no wizard mixes | In the older **Other** flow, turn **Create reviewed CH1-CH9 ON** before continuing. In the new category, complete a valid review and continue with **Next**. |
+| Create control is disabled | Fill in arm, throttle hold and all three profile positions; assign blackbox/rescue or turn their Ignore options ON. No validation message is shown. Check the setup confirmations and unassigned fields. |
+| Saved model has no wizard mixes | In the older **Other** flow, turn **Create CH1-CH9 ON** before continuing. In the new category, complete a valid review and continue with **Next**. |
 | `cannot open ... model_wizard.lua` | Reinstall the complete current package under the exact folder name shown above. Clear the affected compiled caches and restart Ethos. |
 | Changes do not appear after an update | With the radio or simulator closed, remove `main.luac`, `lib/register_model_wizard.luac` and `app/lib/model_wizard.luac` if present. Keep the corresponding `.lua` files. Restart Ethos to recompile them. |
 
@@ -216,3 +223,11 @@ See `tests/README.md` for simulator validation instructions.
 ## License
 
 GPLv3: <https://www.gnu.org/licenses/gpl-3.0.en.html>
+
+The older System tool uses the supplied Model Wizard RF Helicopter logo. The
+newer Rotorflight category keeps its existing icon. To regenerate the older
+icon, install Pillow and run `python assets/build_legacy_icon.py`. Normal ZIP
+packaging uses the checked-in mask and needs no image library.
+
+The older System tile has no separate text label; the enlarged logo supplies
+its title. Select that logo to open the launcher.

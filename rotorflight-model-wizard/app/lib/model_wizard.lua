@@ -3,36 +3,47 @@
   GPLv3 -- https://www.gnu.org/licenses/gpl-3.0.en.html
 ]] --
 
--- Native NEW-model wizard pages. Other avoids Ethos's stock helicopter mixes.
+-- Shared controller for the Rotorflight category and older Other-model pages.
 local wizard = {}
 local enabled, reviewed, attempted, allocationConfirmed = false, false, false, false
-local otherConfirmed = false
 local categoryMode = false
 local ignored = {}
 local positions = {}
-local layouts = {
-    standard = {
-        names = {"Aileron", "Elevator", "RF Throttle", "Rudder", "Pitch", "RF Arm", "RF Profile", "RF Blackbox", "RF Rescue"},
-        arm = 6, throttle = 3, collective = 5
-    },
-    elrs = {
-        names = {"Aileron", "Elevator", "Pitch", "Rudder", "RF Arm", "RF Throttle", "RF Profile", "RF Blackbox", "RF Rescue"},
-        arm = 5, throttle = 6, collective = 3
-    }
+local textWidth, textLimit
+local elrs = false
+local channelNames = {
+    "Aileron", "Elevator", "RF Throttle", "Rudder", "Pitch",
+    "RF Arm", "RF Profile", "RF Blackbox", "RF Rescue"
 }
-local layout = layouts.standard
 local labels = {
     "Armed position (CH6)", "Throttle hold (CH3)",
     "Profile 1 (CH7 -100%)", "Profile 2 (CH7 0%)", "Profile 3 (CH7 +100%)",
     "Blackbox active (CH8)", "Rescue active (CH9)"
 }
 
+local titles = {"Rotorflight switch setup (Requirements)", "Arm", "Throttle hold", "Rates / profile", "Blackbox", "Rescue"}
+local reviewLabel = "CH6 Arm / CH3 Hold"
+local stickSummary = "CH1 Ail / CH2 Ele / CH4 Rud / CH5 Collective"
+
+local function selectLayout(value)
+    if elrs == value then return end
+    elrs = value
+    local arm, throttle = value and 5 or 6, value and 6 or 3
+    labels[1] = "Armed position (CH" .. arm .. ")"
+    labels[2] = "Throttle hold (CH" .. throttle .. ")"
+    reviewLabel = "CH" .. arm .. " Arm / CH" .. throttle .. " Hold"
+    stickSummary = value and "CH1 Ail / CH2 Ele / CH3 Collective / CH4 Rud"
+        or "CH1 Ail / CH2 Ele / CH4 Rud / CH5 Collective"
+    channelNames[3] = value and "Pitch" or "RF Throttle"
+    channelNames[5] = value and "RF Arm" or "Pitch"
+    channelNames[6] = value and "RF Throttle" or "RF Arm"
+end
+
 local function text(value, topOffset)
-    local width = lcd.getWindowSize()
-    local limit = math.max(16, math.floor((width - 16) / 14))
     while #value > 0 do
-        local count = math.min(#value, limit)
-        if count < #value then
+        local count = #value
+        if count > textLimit then
+            count = textLimit
             local space = value:sub(1, count + 1):match("^.*() ")
             if space and space > 1 then count = space - 1 end
             while count > 0 and count < #value do
@@ -42,19 +53,15 @@ local function text(value, topOffset)
             end
         end
         form.addStaticText(form.addLine("", nil, false),
-            {x = 0, y = topOffset or 0, w = width - 16, h = 40}, value:sub(1, count))
+            {x = 0, y = topOffset or 0, w = textWidth - 16, h = 40},
+            count == #value and value or value:sub(1, count))
+        if count == #value then return end
         value = value:sub(count + 1):gsub("^ +", "")
     end
 end
 
-local function switchLabel(index)
-    if index == 1 then return "Armed position (CH" .. layout.arm .. ")" end
-    if index == 2 then return "Throttle hold (CH" .. layout.throttle .. ")" end
-    return labels[index]
-end
-
 local function switchField(index)
-    local field = form.addSwitchField(form.addLine(switchLabel(index)), nil,
+    local field = form.addSwitchField(form.addLine(labels[index]), nil,
         function() return positions[index] end,
         function(value)
             if attempted then return end
@@ -75,10 +82,7 @@ local function optionalSwitch(index, label, optionOnly)
             if assignment then assignment:enable(not value) end
         end)
     field:enable(not attempted)
-    if not optionOnly then
-        text("Ignore keeps this channel inactive at -100%.")
-        assignment = switchField(index)
-    end
+    if not optionOnly then assignment = switchField(index) end
 end
 
 local function positionName(index)
@@ -95,38 +99,46 @@ local function physicalSwitch(source)
     return math.floor(source:member() / 3)
 end
 
-local function validate()
-    if not otherConfirmed then return "Restart creation: select Other, then confirm it." end
-    if not allocationConfirmed then return "System > Sticks: confirm First four fixed OFF." end
+local function validAssignments()
+    if not allocationConfirmed then return false end
     for i = 1, #labels do
         local source = positions[i]
         if not ignored[i] and (not source or source:category() ~= CATEGORY_SWITCH_POSITION or source:options() ~= 0) then
-            return "Select a physical switch position:" .. " " .. switchLabel(i)
+            return false
         end
     end
-    local a, b, c = positions[3], positions[4], positions[5]
-    if physicalSwitch(a) ~= physicalSwitch(b) or physicalSwitch(a) ~= physicalSwitch(c)
-        or a:member() == b:member() or a:member() == c:member() or b:member() == c:member() then
-        return "Use all three positions of one switch for each selector."
+    local a, b, c = positions[3]:member(), positions[4]:member(), positions[5]:member()
+    local profileSwitch = math.floor(a / 3)
+    if profileSwitch ~= math.floor(b / 3) or profileSwitch ~= math.floor(c / 3)
+        or a == b or a == c or b == c then
+        return false
     end
-    if physicalSwitch(positions[1]) == physicalSwitch(positions[2])
-        or (not ignored[7] and (physicalSwitch(positions[1]) == physicalSwitch(positions[7])
-            or physicalSwitch(positions[2]) == physicalSwitch(positions[7]))) then
-        return "Arm, hold and rescue need separate switches."
+    local arm, hold = physicalSwitch(positions[1]), physicalSwitch(positions[2])
+    if arm == hold then return false end
+    if not ignored[7] then
+        local rescue = physicalSwitch(positions[7])
+        if rescue == arm or rescue == hold then return false end
     end
+    return true
 end
 
 function wizard.close()
     for key in pairs(positions) do positions[key] = nil end
     for key in pairs(ignored) do ignored[key] = nil end
     enabled, reviewed, attempted, allocationConfirmed = false, false, false, false
-    otherConfirmed, categoryMode = false, false
-    layout = layouts.standard
+    categoryMode = false
+    textWidth, textLimit = nil, nil
+    selectLayout(false)
+end
+
+function wizard.startLegacy()
+    wizard.close()
+    enabled = true
 end
 
 function wizard.startCategory()
-    wizard.close()
-    categoryMode, enabled, otherConfirmed = true, true, true
+    wizard.startLegacy()
+    categoryMode = true
 end
 
 function wizard.available(page)
@@ -139,20 +151,17 @@ function wizard.available(page)
 end
 
 function wizard.build(page)
-    text(page == 7 and (layout == layouts.elrs and "Rotorflight review: ELRS" or "Rotorflight review: Standard") or "Rotorflight switch setup", 12)
-    if attempted then text("Draft locked; restart creation to edit.") end
+    local width = lcd.getWindowSize()
+    if width ~= textWidth then
+        textWidth, textLimit = width, math.max(16, math.floor((width - 16) / 14))
+    end
+    text(page == 7 and (elrs and "Rotorflight review: ELRS" or "Rotorflight review: FrSky") or titles[page], 12)
+    if page > 1 and page < 7 then
+        text("Click box and flip desired switch and switch direction.")
+    end
     if page == 1 then
         text("System > Sticks: First four channels fixed OFF.")
         local field
-        if not categoryMode then
-            field = form.addBooleanField(form.addLine("Other model selected"), nil,
-                function() return otherConfirmed end,
-                function(value)
-                    if attempted then return end
-                    otherConfirmed = value; reviewed = false
-                end)
-            field:enable(not attempted)
-        end
         field = form.addBooleanField(form.addLine("First four fixed OFF"), nil,
             function() return allocationConfirmed end,
             function(value)
@@ -160,24 +169,11 @@ function wizard.build(page)
                 allocationConfirmed = value; reviewed = false
             end)
         field:enable(not attempted)
-        if not categoryMode then
-            field = form.addBooleanField(form.addLine("Set up Rotorflight switches"), nil,
-                function() return enabled end,
-                function(value)
-                    if attempted then return end
-                    enabled = value
-                    if not value then layout = layouts.standard end
-                    reviewed = false
-                end)
-            field:enable(not attempted)
-        end
         field = form.addBooleanField(form.addLine("Use ELRS channel order"), nil,
-            function() return layout == layouts.elrs end,
+            function() return elrs end,
             function(value)
                 if attempted then return end
-                layout = value and layouts.elrs or layouts.standard
-                -- Selecting an ELRS model also opts into its setup pages.
-                if value then enabled = true end
+                selectLayout(value)
                 reviewed = false
             end)
         field:enable(not attempted)
@@ -188,25 +184,20 @@ function wizard.build(page)
     elseif page == 2 then
         switchField(1)
     elseif page == 3 then
-        text("CH" .. layout.throttle .. ": hold -100%, released +100% (FC governor).")
         switchField(2)
     elseif page == 4 then
-        text("CH7 selects both rates and profile: -100%, 0%, +100%.")
         for i = 3, 5 do switchField(i) end
     elseif page == 5 then
         if categoryMode then switchField(6) else optionalSwitch(6, "Ignore blackbox") end
     elseif page == 6 then
         if categoryMode then switchField(7) else optionalSwitch(7, "Ignore rescue") end
     elseif page == 7 then
-        local problem = validate()
-        -- Keep the confirmation above the summary and any validation message.
-        -- Missing assignments must never push it beneath native navigation.
+        local ready = validAssignments()
         if categoryMode then
-            if not attempted then reviewed = problem == nil end
-            text(problem and "Complete required assignments before Next." or "Next creates reviewed CH1-CH9.")
+            if not attempted then reviewed = ready end
         elseif not attempted then
             local field
-            field = form.addBooleanField(form.addLine("Create reviewed CH1-CH9"), nil,
+            field = form.addBooleanField(form.addLine("Create CH1-CH9"), nil,
                 function() return reviewed end,
                 function(value)
                     if not value or attempted then return end
@@ -215,21 +206,17 @@ function wizard.build(page)
                     wizard.run()
                     field:enable(false)
                 end)
-            field:enable(problem == nil)
+            field:enable(ready)
         end
-        if problem then
-            text(problem)
-        else
-            text("CH1 Ail / CH2 Ele / CH4 Rud / CH" .. layout.collective .. " Collective")
-        end
-        reviewRow("CH" .. layout.arm .. " Arm / CH" .. layout.throttle .. " Hold", positionName(1) .. " / " .. positionName(2))
+        text(stickSummary)
+        reviewRow(reviewLabel, positionName(1) .. " / " .. positionName(2))
         reviewRow("CH7 Rates / Profile", positionName(3) .. " / " .. positionName(4) .. " / " .. positionName(5))
         reviewRow("CH8 Blackbox / CH9 Rescue", positionName(6) .. " / " .. positionName(7))
     end
 end
 
 local function addMix(index, spec)
-    spec.name = layout.names[index]
+    spec.name = channelNames[index]
     model.createMix("free", spec)
     -- Native wizard output allocation is deferred until the model is saved.
     -- getChannel() here reads the active model, not the draft being built.
@@ -244,20 +231,17 @@ local function binary(index, source, active, inactive)
 end
 
 function wizard.run()
-    if not enabled or attempted then return end
-    local problem = validate()
-    if problem then error(problem) end
-    if not reviewed then error("Review the Rotorflight switch assignments before finishing.") end
+    if not enabled or attempted or not reviewed or not validAssignments() then return false end
     -- Free mixes are allocated in sequence; the API has no output-edit method.
     -- Require the Other / first-four-fixed-OFF preparation, then create the
     -- entire map in order. Never retry a failed/partial generation.
     attempted = true
-    stick(1, ANALOG_STICK_AILERON) -- Aileron
-    stick(2, ANALOG_STICK_ELEVATOR) -- Elevator
+    stick(1, ANALOG_STICK_AILERON)
+    stick(2, ANALOG_STICK_ELEVATOR)
     -- Sequential free-mix allocation determines channel numbers.
-    if layout == layouts.elrs then stick(3, ANALOG_STICK_THROTTLE) else binary(3, positions[2], -100, 100) end
-    stick(4, ANALOG_STICK_RUDDER) -- Rudder
-    if layout == layouts.elrs then
+    if elrs then stick(3, ANALOG_STICK_THROTTLE) else binary(3, positions[2], -100, 100) end
+    stick(4, ANALOG_STICK_RUDDER)
+    if elrs then
         binary(5, positions[1], 100, -100) -- ELRS AUX1 arm, low when disarmed.
         binary(6, positions[2], -100, 100) -- FC governor command.
     else
@@ -277,6 +261,7 @@ function wizard.run()
             binary(index + 2, positions[index], 100, -100)
         end
     end
+    return true
 end
 
 return wizard
