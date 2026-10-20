@@ -1,4 +1,4 @@
-# Rotorflight Model Wizard
+Rotorflight Model Wizard
 
 A standalone Lua wizard that creates a Rotorflight or Heli FBL radio model
 through Ethos's built-in **Create model** flow. Choose **FrSky RF**, **ELRS RF** or
@@ -9,7 +9,7 @@ and rescue. Heli FBL assigns governor control, gyro gain, collective pitch, bank
 and rescue across eight channels. The full Rotorflight Lua suite, an internet connection and a connected
 flight controller are not required to create the model.
 
-## Requirements
+ Requirements
 
 - Ethos firmware supporting Lua wizard pages, mix creation and (for Heli FBL) logic switch creation. Tested with
   X18RS simulators running **26.1.2** and **26.2.0-RC1**.
@@ -22,7 +22,7 @@ Wizard** System tool: its launch button activates the setup pages for one
 creation session. Normal model creation keeps those pages hidden. The new API was announced for
 **26.2.0-RC2**. The 26.1.2 and 26.2.0-RC1 simulators do not provide it.
 
-The **First four channels fixed OFF** checkbox confirms your manual stick
+The First four channels fixed OFF** checkbox confirms your manual stick
 setting; the wizard does not change that setting automatically. The new
 Rotorflight category selects the Other model type automatically.
 
@@ -31,10 +31,7 @@ The category registration and controller were tested with an API shim on
 rendered through a test adapter. The real RC2 category tile and automatic
 callback timing still need verification on supporting firmware.
 
-API references: [registerWizard](https://ethos-lua-doc.frsky-rc.com/api/system/registerWizard/)
-and [registerWizardPage](https://ethos-lua-doc.frsky-rc.com/api/system/registerWizardPage/).
-
-## Installation
+ Installation
 
 1. Extract `rotorflight-model-wizard-standalone-en.zip`.
 2. Copy the entire **rotorflight-model-wizard** folder into the radio or
@@ -62,7 +59,7 @@ Keep the folder name **rotorflight-model-wizard** unchanged. Keep all three
 Lua files and both icon PNG files together; copying only `main.lua` is insufficient. The script uses
 absolute file paths so its later callbacks work on physical radios.
 
-### Using it alongside the full suite
+ Using it alongside the full suite
 
 If `scripts/rfsuite/lib/register_model_wizard.lua` exists, the standalone
 copy defers to the suite's wizard integration to avoid duplicate pages.
