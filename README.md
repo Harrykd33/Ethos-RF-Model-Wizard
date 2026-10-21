@@ -4,9 +4,6 @@ Standalone model creation for **FrSky RF**, **ELRS RF** and **Heli FBL**.
 Select the model type on the **Create Heli FBL Model** page, assign physical
 switch positions, review the channel map, then name and save the model.
 
-The current package is **0.7.5**. It works without the full Rotorflight Lua
-suite, an internet connection or a connected flight controller.
-
 ## Features
 
 - FrSky RF and ELRS RF: nine-channel Rotorflight layouts with arm, throttle
@@ -64,18 +61,11 @@ scripts/
 Keep the folder name unchanged and install all three Lua files and both icons.
 The current test installation locations are:
 
-- Simulator: `C:\Users\dover\AppData\Roaming\FrSky Suite\.simulator\26.1.2\persist\X18RS\scripts\rotorflight-model-wizard`
 - Radio drive: `D:\scripts\rotorflight-model-wizard`
 
 ### Full-suite coexistence
 
-If `scripts/rfsuite/lib/register_model_wizard.lua` exists, this standalone
-script defers to that suite integration to prevent duplicate wizard pages.
-For standalone use, close the radio or simulator before moving the suite's
-`rfsuite` folder to a backup location outside **scripts**. Keep your models,
-`radio.bin` and `rfsuite.user` data.
 
-The older script named **rotorflight-wizard** is a separate installation.
 
 ## Open the wizard
 
@@ -209,30 +199,6 @@ The wizard does not write flight-controller or ESC settings.
 | Lua file cannot open, or old code still loads | Reinstall the complete package. With the radio/simulator closed, remove stale `main.luac`, `lib/register_model_wizard.luac` and `app/lib/model_wizard.luac` if present; keep the matching `.lua` files. Restart. |
 
 Incomplete assignments leave creation disabled without validation popups.
-
-## Build and icon assets
-
-From the **Ethos RF Model Wizard** repository root, run:
-
-```powershell
-python package.py
-```
-
-This rebuilds `rotorflight-model-wizard-standalone-en.zip` from the standalone
-folder and `ethos_lua_manifest.json`, including this README and both icons.
-Python's standard library is sufficient; tests and compiled Lua caches are
-excluded. Simulator test notes are in [tests/README.md](tests/README.md).
-
-Both wizard versions use the larger helicopter-only glyph extracted from
-`assets/Model Wizard Helicopter Icon.png`. The embedded title, panel and frame
-are omitted so Ethos controls the label, background, border and theme colors.
-The older System tool is **Model Wizard**; the newer category is **Rotorflight**.
-
-To regenerate the checked-in icon masks, install Pillow and run:
-
-```powershell
-python assets/build_icon.py
-```
 
 ## License
 
