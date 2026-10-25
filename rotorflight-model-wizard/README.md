@@ -7,6 +7,8 @@ the model-category launcher in Ethos 26.2.0.
 
 ## Install
 
+[Download Heli Wizard (ZIP)](https://github.com/Harrykd33/Ethos-RF-Model-Wizard/raw/refs/heads/main/rotorflight-model-wizard-standalone-en.zip)
+
 1. Extract `rotorflight-model-wizard-standalone-en.zip`.
 2. Copy the complete `rotorflight-model-wizard` folder into the radio or
    simulator's `scripts` folder. Keep the folder name unchanged and include
