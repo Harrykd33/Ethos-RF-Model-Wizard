@@ -18,8 +18,14 @@ end
 local fields, texts = {}, {}
 local nativeForm, nativeWindowSize = form, lcd.getWindowSize
 lcd.getWindowSize = function() return 800, 480 end
-form = {addLine = function(label) return label end, addStaticText = function(_, _, value) texts[value] = true end}
+local function line(label) return {label = label} end
+local function staticText(line, rect, value)
+    texts[value] = true
+    if line and rect and rect.x == 0 then line.label = value end
+end
+form = {height = function() return 108 end, addLine = line, addStaticText = staticText}
 local function field(label, _, get, set)
+    if type(label) == "table" then label = label.label end
     local result = {get = get, set = set}
     result.enable = function(_, value) result.enabled = value end
     fields[label] = result
@@ -63,7 +69,8 @@ local function allHidden()
 end
 local function launch()
     tool.create()
-    assert(texts["System > Sticks: First four channels fixed OFF."] and texts["Large + tile > Create model > Other."], "Legacy launch instructions")
+    assert(texts["Requirements:"] and texts["Go back to System, select Sticks, then disable"]
+        and texts["First four channels fixed."] and texts["Large + tile > Create model > Other."], "Legacy launch instructions")
     allHidden() -- Opening and cancelling the tool must not arm a session.
     fields["Create Heli FBL Model"].press()
     assert(opened and opened.model == 0, "Tool opens model selection")
@@ -180,10 +187,10 @@ local function reviewReady(expected)
     for key in pairs(texts) do texts[key] = nil end
     wizard.build(7)
     if TEST_CATEGORY then
-        assert(not fields["Create CH1-CH9"], "Category uses native Next/run")
+        assert(not fields["Click button to create CH1-CH9"], "Category uses native Next/run")
         if not expected then assert(wizard.run() == false, "Incomplete category review cannot create mixes") end
     else
-        assert(fields["Create CH1-CH9"].enabled == expected, "Legacy review validity")
+        assert(fields["Click button to create CH1-CH9"].enabled == expected, "Legacy review validity")
     end
 end
 reviewReady(true)
@@ -216,7 +223,7 @@ assert(wizard.run() == false, "Arm and hold must be independent")
 set(holdLabel, position(3))
 reviewReady(true)
 if TEST_CATEGORY then wizard.run() -- Native final-page callback generates all channels.
-else set("Create CH1-CH9", true) end -- Legacy Other requires explicit generation.
+else set("Click button to create CH1-CH9", true) end -- Legacy Other requires explicit generation.
 model.dirty() -- The macro uses a live test model; native creation saves its draft.
 wizard.run()
 local names = TEST_ELRS
@@ -283,7 +290,7 @@ if TEST_IGNORE_BLACKBOX then assert(output(8) == -1024, "Ignored blackbox after 
 if TEST_IGNORE_RESCUE then assert(output(9) == -1024, "Ignored rescue after reload") end
 wizard.close()
 assert(not wizard.available(), "Cleanup")
-form = {addLine = function(label) return label end, addStaticText = function() end,
+form = {height = function() return 108 end, addLine = line, addStaticText = staticText,
     addSwitchField = field, addBooleanField = field, addChoiceField = function(label, rect, choices, get, set) return field(label, rect, get, set) end}
 lcd.getWindowSize = function() return 800, 480 end
 wizard.build(1)

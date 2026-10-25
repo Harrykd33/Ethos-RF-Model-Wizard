@@ -58,7 +58,7 @@ local function selectLayout(selection)
     channelNames[6] = value and "RF Throttle" or "RF Arm"
 end
 
-local function text(value, topOffset)
+local function text(value, topOffset, themeColor, absolute)
     while #value > 0 do
         local count = #value
         if count > textLimit then
@@ -71,12 +71,24 @@ local function text(value, topOffset)
                 count = count - 1
             end
         end
-        form.addStaticText(form.addLine("", nil, false),
-            {x = 0, y = topOffset or 0, w = textWidth - 16, h = 40},
+        local line
+        if not absolute then line = form.addLine("", nil, false) end
+        local field = form.addStaticText(line,
+            {x = 0, y = topOffset or 0, w = textWidth - 16, h = absolute and 32 or 40},
             count == #value and value or value:sub(1, count))
-        if count == #value then return end
+        if themeColor and field and field.color then field:color(lcd.themeColor(themeColor)) end
+        if count == #value then return (topOffset or 0) + 36 end
+        if absolute then topOffset = (topOffset or 0) + 36 end
         value = value:sub(count + 1):gsub("^ +", "")
     end
+end
+
+local function coloredLine(label, themeColor)
+    local line = form.addLine("")
+    local labelField = form.addStaticText(line,
+        {x = 0, y = 8, w = textWidth - 180, h = 40}, label)
+    if labelField and labelField.color then labelField:color(lcd.themeColor(themeColor)) end
+    return line
 end
 
 local function switchField(index, line, rect)
@@ -110,8 +122,20 @@ local function positionName(index)
     return source and source:name() or "---"
 end
 
-local function reviewRow(label, value)
-    form.addStaticText(form.addLine(label, nil, false), nil, value)
+local function reviewSummary(rows)
+    -- Parent these fields directly to the form. A FormLine clips its children
+    -- to one native row, even when a child rectangle extends below that row.
+    local y = form.height() + 2
+    local split = math.floor(textWidth * 0.5)
+    for _, row in ipairs(rows) do
+        if row[2] then
+            form.addStaticText(nil, {x = 0, y = y, w = split - 8, h = 32}, row[1])
+            form.addStaticText(nil, {x = split, y = y, w = textWidth - split - 16, h = 32}, row[2])
+            y = y + 36
+        else
+            y = text(row[1], y, nil, true)
+        end
+    end
 end
 
 local function physicalSwitch(source)
@@ -230,12 +254,12 @@ function wizard.build(page)
     local title = page == 7 and (layout == 3 and "Heli FBL review" or elrs and "Rotorflight review: ELRS" or "Rotorflight review: FrSky")
         or layout == 3 and fblTitles[page] or titles[page]
     if layout == 3 and page == 4 and throttleMode == 2 then title = "ESC gov CH3 / Bank/IdleUP CH7" end
-    text(title, 12)
+    text(title, 12, page > 1 and page < 7 and THEME_WARNING_COLOR or nil)
     if page > 1 and page < 7 then
         text("Click box and flip desired switch and switch direction.")
     end
     if page == 1 then
-        text("System > Sticks: First four channels fixed OFF.")
+        text("Click the button below to confirm you disabled first four channels", nil, THEME_WARNING_COLOR)
         local field
         field = form.addBooleanField(form.addLine("First four fixed OFF"), nil,
             function() return allocationConfirmed end,
@@ -291,7 +315,7 @@ function wizard.build(page)
             if not attempted then reviewed = ready end
         elseif not attempted then
             local field
-            field = form.addBooleanField(form.addLine(layout == 3 and "Create CH1-CH8" or "Create CH1-CH9"), nil,
+            field = form.addBooleanField(coloredLine(layout == 3 and "Click button to create CH1-CH8" or "Click button to create CH1-CH9", THEME_ERROR_COLOR), nil,
                 function() return reviewed end,
                 function(value)
                     if not value or attempted then return end
@@ -303,16 +327,20 @@ function wizard.build(page)
             field:enable(ready)
         end
         if layout == 3 then
-            text("CH1 Ail / CH2 Ele / CH4 Rud / CH6 Collective")
-            text("CH3 " .. (throttleMode == 1 and "FBL gov On" or "ESC gov: " .. valuesText(speeds)) .. " / Hold " .. positionName(2))
-            text("CH5 Gyro: " .. valuesText(gains) .. " / " .. positionsText(8))
-            reviewRow("CH7 Bank/IdleUP / CH8 Rescue", positionsText(3) .. " / " .. positionName(7))
+            reviewSummary({
+                {"CH1 Ail / CH2 Ele / CH4 Rud / CH6 Collective"},
+                {"CH3 " .. (throttleMode == 1 and "FBL gov On" or "ESC gov: " .. valuesText(speeds)) .. " / Hold " .. positionName(2)},
+                {"CH5 Gyro: " .. valuesText(gains) .. " / " .. positionsText(8)},
+                {"CH7 Bank/IdleUP / CH8 Rescue", positionsText(3) .. " / " .. positionName(7)}
+            })
             return
         end
-        text(stickSummary)
-        reviewRow(reviewLabel, positionName(1) .. " / " .. positionName(2))
-        reviewRow("CH7 Rates / Profile", positionName(3) .. " / " .. positionName(4) .. " / " .. positionName(5))
-        reviewRow("CH8 Blackbox / CH9 Rescue", positionName(6) .. " / " .. positionName(7))
+        reviewSummary({
+            {stickSummary},
+            {reviewLabel, positionName(1) .. " / " .. positionName(2)},
+            {"CH7 Rates / Profile", positionName(3) .. " / " .. positionName(4) .. " / " .. positionName(5)},
+            {"CH8 Blackbox / CH9 Rescue", positionName(6) .. " / " .. positionName(7)}
+        })
     end
 end
 

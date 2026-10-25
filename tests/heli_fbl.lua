@@ -4,14 +4,16 @@ simulator.sleep(0.2)
 local nativeForm, nativeSize = form, lcd.getWindowSize
 local fields = {}
 local function field(label, rect, get, set)
+    if type(label) == "table" then label = label.label end
     local f = {get = get, set = set, enable = function(self, v) self.enabled = v end, suffix = function() end}
     fields[label] = f
     return f
 end
-form = {addLine = function(label) return label end, addStaticText = function() end,
+form = {height = function() return 108 end, addLine = function(label) return {label = label} end,
+    addStaticText = function(line, rect, value) if line and rect and rect.x == 0 then line.label = value end end,
     addSwitchField = field, addBooleanField = field,
     addChoiceField = function(label, rect, choices, get, set) return field(label, rect, get, set) end,
-    addNumberField = function(label, rect, low, high, get, set) return field(label .. " value", rect, get, set) end}
+    addNumberField = function(line, rect, low, high, get, set) return field(line.label .. " value", rect, get, set) end}
 lcd.getWindowSize = function() return 800, 480 end
 local function set(label, value) assert(fields[label], label).set(value) end
 local function position(member) return system.getSource({category = CATEGORY_SWITCH_POSITION, member = member}) end
@@ -43,7 +45,7 @@ local function ready(expected)
     wizard.build(7)
     if TEST_CATEGORY then
         if not expected then assert(wizard.run() == false, "Invalid category rejected") end
-    else assert(fields["Create CH1-CH8"].enabled == expected, "Review availability") end
+    else assert(fields["Click button to create CH1-CH8"].enabled == expected, "Review availability") end
 end
 set(bankLabels[2], position(TEST_SHARED and 6 or 9))
 ready(false) -- Duplicated bank position.
@@ -66,7 +68,7 @@ ready(true)
 local nativeLogicSwitch = model.createLogicSwitch
 if not TEST_ESC then model.createLogicSwitch = nil end
 ready(true)
-if TEST_CATEGORY then assert(wizard.run()) else set("Create CH1-CH8", true) end
+if TEST_CATEGORY then assert(wizard.run()) else set("Click button to create CH1-CH8", true) end
 model.createLogicSwitch = nativeLogicSwitch
 model.dirty()
 local names = {"Aileron", "Elevator", "Throttle", "Rudder", "Gyro Gain", "Collective", "Bank/IdleUP", "Rescue"}

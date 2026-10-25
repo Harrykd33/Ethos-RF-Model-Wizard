@@ -63,10 +63,13 @@ return function(baseDir)
                 clearController()
                 active, pending = false, false
                 local width = lcd.getWindowSize()
-                local function instruction(value)
-                    form.addStaticText(form.addLine("", nil, false), {x = 0, y = 0, w = width - 16, h = 40}, value)
+                local function instruction(value, color)
+                    local field = form.addStaticText(form.addLine("", nil, false), {x = 0, y = 0, w = width - 16, h = 40}, value)
+                    if field and field.color then field:color(lcd.themeColor(color or THEME_WARNING_COLOR)) end
                 end
-                instruction("System > Sticks: First four channels fixed OFF.")
+                instruction("Requirements:", THEME_ERROR_COLOR)
+                instruction("Go back to System, select Sticks, then disable")
+                instruction("First four channels fixed.")
                 instruction("Press Create Heli FBL Model below, then choose:")
                 instruction("Large + tile > Create model > Other.")
                 form.addTextButton(form.addLine(""), nil, "Create Heli FBL Model", function()
