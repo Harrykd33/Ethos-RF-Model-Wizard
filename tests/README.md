@@ -214,3 +214,15 @@ The native 26.1.2 menu was visually checked with the icon selected and unselecte
 Ethos supplies black/orange and white/dark appearances respectively. The native
 launcher/creation/reload flow and both registration paths passed; modern
 registration still uses the API shim.
+
+## Explicit creation on Ethos 26.2.0
+
+The category review now uses the same warning/critical theme colors, wording,
+compact summary and explicit Create confirmation as the legacy wizard.
+Creating mixes no longer depends on the native Other-model run callback.
+`review_creation.lua` runs from the repository root with a host Lua interpreter
+and mocks the firmware APIs. It covers 24 legacy/category configurations,
+missing assignments, the confirmation gate, exact mix counts, warning/critical
+labels and repeated-click/native-callback duplicate prevention. All 24 pass.
+Native 26.2.0-RC3 creation, naming and save/reload remain to be checked in the
+simulator; these host checks do not verify firmware draft persistence.

@@ -80,7 +80,7 @@ local function launch()
 end
 register()
 assert(#descriptors == 7 and loads == 0 and masks == 1 and tools == 1, "Lazy legacy registration")
-assert(tool.name == "Model Wizard", "Ethos supplies the tile title")
+assert(tool.name == "Heli Wizard", "Ethos supplies the tile title")
 descriptors[1].init()
 allHidden()
 descriptors[1].build()
@@ -109,7 +109,7 @@ assert(loads == 3 and lastControllerPath == "SCRIPTS:/rotorflight-model-wizard/a
 local category
 system.registerWizardPage = nil
 system.registerWizard = function(name, icon, pages)
-    assert(name == "Rotorflight" and icon and #pages == 7, "Category registration")
+    assert(name == "Heli Wizard" and icon and #pages == 7, "Category registration")
     category = pages
 end
 local beforeLoads, beforeMasks, beforeTools = loads, masks, tools
@@ -186,12 +186,7 @@ assert(wizard.run() == false, "Generation requires a completed review")
 local function reviewReady(expected)
     for key in pairs(texts) do texts[key] = nil end
     wizard.build(7)
-    if TEST_CATEGORY then
-        assert(not fields["Click button to create CH1-CH9"], "Category uses native Next/run")
-        if not expected then assert(wizard.run() == false, "Incomplete category review cannot create mixes") end
-    else
-        assert(fields["Click button to create CH1-CH9"].enabled == expected, "Legacy review validity")
-    end
+    assert(fields["Click button to create CH1-CH9"].enabled == expected, "Review validity in both firmware paths")
 end
 reviewReady(true)
 if TEST_IGNORE_BLACKBOX then
@@ -212,7 +207,7 @@ if TEST_IGNORE_RESCUE then
     reviewReady(true) -- An ignored rescue may retain an unused colliding selection.
     set("Rescue active (CH9)", nil)
 end
-if not TEST_CATEGORY then assert(wizard.run() == false, "Review must be confirmed") end
+assert(wizard.run() == false, "Review must be confirmed")
 set("Profile 2 (CH7 0%)", position(6))
 reviewReady(false)
 assert(wizard.run() == false, "Duplicated profile position")
@@ -222,8 +217,7 @@ reviewReady(false)
 assert(wizard.run() == false, "Arm and hold must be independent")
 set(holdLabel, position(3))
 reviewReady(true)
-if TEST_CATEGORY then wizard.run() -- Native final-page callback generates all channels.
-else set("Click button to create CH1-CH9", true) end -- Legacy Other requires explicit generation.
+set("Click button to create CH1-CH9", true) -- Explicit creation in both firmware paths.
 model.dirty() -- The macro uses a live test model; native creation saves its draft.
 wizard.run()
 local names = TEST_ELRS

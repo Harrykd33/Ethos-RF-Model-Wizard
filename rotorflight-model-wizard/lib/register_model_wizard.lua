@@ -54,11 +54,11 @@ return function(baseDir)
     local iconPath = categoryMode and "/icon.png" or "/legacy-icon.png"
     local icon = assert(lcd.loadMask(baseDir .. iconPath), "Rotorflight wizard icon missing")
     if categoryMode then
-        system.registerWizard("Rotorflight", icon, pages)
+        system.registerWizard("Heli Wizard", icon, pages)
     else
         for _, page in ipairs(pages) do system.registerWizardPage(page) end
         system.registerSystemTool({
-            name = "Model Wizard", icon = icon,
+            name = "Heli Wizard", icon = icon,
             create = function()
                 clearController()
                 active, pending = false, false

@@ -254,7 +254,12 @@ function wizard.build(page)
     local title = page == 7 and (layout == 3 and "Heli FBL review" or elrs and "Rotorflight review: ELRS" or "Rotorflight review: FrSky")
         or layout == 3 and fblTitles[page] or titles[page]
     if layout == 3 and page == 4 and throttleMode == 2 then title = "ESC gov CH3 / Bank/IdleUP CH7" end
-    text(title, 12, page > 1 and page < 7 and THEME_WARNING_COLOR or nil)
+    if categoryMode and page == 1 then
+        text("Requirements:", 12, THEME_ERROR_COLOR)
+        text("Go back to System, select Sticks, then disable First four channels fixed.", nil, THEME_WARNING_COLOR)
+    else
+        text(title, 12, page > 1 and page < 7 and THEME_WARNING_COLOR or nil)
+    end
     if page > 1 and page < 7 then
         text("Click box and flip desired switch and switch direction.")
     end
@@ -311,16 +316,15 @@ function wizard.build(page)
         if categoryMode then switchField(7) else optionalSwitch(7, "Ignore rescue") end
     elseif page == 7 then
         local ready = validAssignments()
-        if categoryMode then
-            if not attempted then reviewed = ready end
-        elseif not attempted then
+        if not attempted then
             local field
             field = form.addBooleanField(coloredLine(layout == 3 and "Click button to create CH1-CH8" or "Click button to create CH1-CH9", THEME_ERROR_COLOR), nil,
                 function() return reviewed end,
                 function(value)
                     if not value or attempted then return end
                     reviewed = true
-                    -- Other omits Ethos's channel-review run callback.
+                    -- Create explicitly in both firmware paths; do not depend
+                    -- on the Other-model wizard dispatching a run callback.
                     wizard.run()
                     field:enable(false)
                 end)

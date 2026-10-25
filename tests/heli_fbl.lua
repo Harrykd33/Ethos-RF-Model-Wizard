@@ -43,9 +43,7 @@ if TEST_ESC then
 end
 local function ready(expected)
     wizard.build(7)
-    if TEST_CATEGORY then
-        if not expected then assert(wizard.run() == false, "Invalid category rejected") end
-    else assert(fields["Click button to create CH1-CH8"].enabled == expected, "Review availability") end
+    assert(fields["Click button to create CH1-CH8"].enabled == expected, "Review availability")
 end
 set(bankLabels[2], position(TEST_SHARED and 6 or 9))
 ready(false) -- Duplicated bank position.
@@ -68,7 +66,7 @@ ready(true)
 local nativeLogicSwitch = model.createLogicSwitch
 if not TEST_ESC then model.createLogicSwitch = nil end
 ready(true)
-if TEST_CATEGORY then assert(wizard.run()) else set("Click button to create CH1-CH8", true) end
+set("Click button to create CH1-CH8", true)
 model.createLogicSwitch = nativeLogicSwitch
 model.dirty()
 local names = {"Aileron", "Elevator", "Throttle", "Rudder", "Gyro Gain", "Collective", "Bank/IdleUP", "Rescue"}

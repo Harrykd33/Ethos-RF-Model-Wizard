@@ -18,7 +18,7 @@ suite, an internet connection or a connected flight controller.
 - Compact Heli FBL pages group related assignments and values together.
 - Larger helicopter icons in both versions, with native Ethos labels, tile
   borders, backgrounds and selected/unselected colors.
-- Automatic choice of the newer Rotorflight category or the older System
+- Automatic choice of the newer Heli Wizard category or the older System
   launcher, depending on the firmware APIs available.
 
 ## Requirements
@@ -26,7 +26,7 @@ suite, an internet connection or a connected flight controller.
 - Ethos with Lua wizard pages and mix creation. Heli FBL **ESC governor** mode
   also requires native logic switch creation; **FBL governor** mode does not.
 - **System > Sticks > First four channels fixed** set to **OFF**.
-- On older firmware, launch **System > Model Wizard** before creating a model,
+- On older firmware, launch **System > Heli Wizard** before creating a model,
   then select **Other** as described below.
 
 The **First four fixed OFF** checkbox confirms your manual setting; the wizard
@@ -84,7 +84,7 @@ The older script named **rotorflight-wizard** is a separate installation.
 Use this flow on firmware such as **26.1.2**:
 
 1. Set **System > Sticks > First four channels fixed OFF**.
-2. Open **System > Model Wizard**. Scroll to the next System menu page if
+2. Open **System > Heli Wizard**. Scroll to the next System menu page if
    needed; look for the large helicopter icon.
 3. Press **Create Heli FBL Model**.
 4. In Model select, choose the large **+ model tile**, then **Create model**.
@@ -102,14 +102,15 @@ launcher without pressing its button does not activate the setup pages.
 Reopen the launcher and leave without pressing the button to clear a pending
 launch before starting creation.
 
-### Newer firmware: Rotorflight category
+### Newer firmware: Heli Wizard category
 
 When the firmware provides `system.registerWizard`, select
-**Model > Model select > + model tile > Create model > Rotorflight**.
+**Model > Model select > + model tile > Create model > Heli Wizard**.
 Confirm the stick setting and select the desired **Model type**.
 
 This category uses the Other model type automatically. On its review page,
-press **Next** to create the mixes; there is no separate create toggle.
+turn **Click button to create CH1-CH9 ON** for RF or **CH1-CH8 ON** for Heli FBL.
+This creates the mixes immediately. Then press **Next** to name and save the model.
 
 ## FrSky RF and ELRS RF setup
 
@@ -199,7 +200,7 @@ The wizard does not write flight-controller or ESC settings.
 
 | Issue | Check |
 | --- | --- |
-| Wizard does not appear | Install the complete folder and restart. On older firmware use **System > Model Wizard > Create Heli FBL Model**, then **Other**. Check for a full-suite integration that takes precedence. |
+| Wizard does not appear | Install the complete folder and restart. On older firmware use **System > Heli Wizard > Create Heli FBL Model**, then **Other**. Check for a full-suite integration that takes precedence. |
 | No Rotorflight category on older firmware | Use the System launcher; the category appears only when the firmware supplies `registerWizard`. |
 | Wrong channel order or a built-in Heli channel page | Set first four channels fixed OFF and start a new creation flow using **Other**. |
 | Create control is disabled for RF | Confirm the stick setting; assign arm, hold and all three profile positions; assign or ignore blackbox/rescue. Check switch separation. |
@@ -226,7 +227,7 @@ excluded. Simulator test notes are in [tests/README.md](tests/README.md).
 Both wizard versions use the larger helicopter-only glyph extracted from
 `assets/Model Wizard Helicopter Icon.png`. The embedded title, panel and frame
 are omitted so Ethos controls the label, background, border and theme colors.
-The older System tool is **Model Wizard**; the newer category is **Rotorflight**.
+Both the older System tool and newer model category are labeled **Heli Wizard**.
 
 To regenerate the checked-in icon masks, install Pillow and run:
 
