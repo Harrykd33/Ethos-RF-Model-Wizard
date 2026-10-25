@@ -1,4 +1,4 @@
-# Ethos RF Model Wizard
+# Ethos Heli Model Wizard
 
 Standalone model creation for **FrSky RF**, **ELRS RF** and **Heli FBL**.
 Select the model type on the **Create Heli FBL Model** page, assign physical
