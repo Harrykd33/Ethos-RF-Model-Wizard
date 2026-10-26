@@ -74,11 +74,11 @@ local function text(value, topOffset, themeColor, absolute)
         local line
         if not absolute then line = form.addLine("", nil, false) end
         local field = form.addStaticText(line,
-            {x = 0, y = topOffset or 0, w = textWidth - 16, h = absolute and 32 or 40},
+            {x = 0, y = topOffset or 0, w = textWidth - 16, h = 40},
             count == #value and value or value:sub(1, count))
         if themeColor and field and field.color then field:color(lcd.themeColor(themeColor)) end
-        if count == #value then return (topOffset or 0) + 36 end
-        if absolute then topOffset = (topOffset or 0) + 36 end
+        if count == #value then return (topOffset or 0) + 40 end
+        if absolute then topOffset = (topOffset or 0) + 40 end
         value = value:sub(count + 1):gsub("^ +", "")
     end
 end
@@ -267,11 +267,15 @@ function wizard.build(page)
         y = text("Click the button below to confirm you disabled first four channels", y + 6,
             THEME_WARNING_COLOR, true)
         local before = form.height()
-        form.addLine("", nil, false)
-        local rowHeight = form.height() - before
-        if rowHeight > 0 then
-            for i = 1, math.ceil((y - form.height()) / rowHeight) do
-                form.addLine("", nil, false)
+        -- Absolute text already contributes to the native form height on
+        -- current Ethos. Only reserve rows if that height is still too short.
+        if before < y then
+            form.addLine("", nil, false)
+            local rowHeight = form.height() - before
+            if rowHeight > 0 then
+                for i = 1, math.ceil((y - form.height()) / rowHeight) do
+                    form.addLine("", nil, false)
+                end
             end
         end
     else
