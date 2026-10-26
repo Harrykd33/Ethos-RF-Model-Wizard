@@ -254,9 +254,26 @@ function wizard.build(page)
     local title = page == 7 and (layout == 3 and "Heli FBL review" or elrs and "Rotorflight review: ELRS" or "Rotorflight review: FrSky")
         or layout == 3 and fblTitles[page] or titles[page]
     if layout == 3 and page == 4 and throttleMode == 2 then title = "ESC gov CH3 / Bank/IdleUP CH7" end
-    if categoryMode and page == 1 then
-        text("Requirements:", 12, THEME_ERROR_COLOR)
-        text("Go back to System, select Sticks, then disable First four channels fixed.", nil, THEME_WARNING_COLOR)
+    if page == 1 then
+        -- Wrapped instructions share a compact text block instead of taking
+        -- a full native form row for every line. Reserve its height before
+        -- adding controls so the fields cannot overlap the instructions.
+        local y = text(categoryMode and "Requirements:" or title, 4,
+            categoryMode and THEME_ERROR_COLOR or nil, true)
+        if categoryMode then
+            y = text("Go back to System, select Sticks, then disable First four channels fixed.", y,
+                THEME_WARNING_COLOR, true)
+        end
+        y = text("Click the button below to confirm you disabled first four channels", y + 6,
+            THEME_WARNING_COLOR, true)
+        local before = form.height()
+        form.addLine("", nil, false)
+        local rowHeight = form.height() - before
+        if rowHeight > 0 then
+            for i = 1, math.ceil((y - form.height()) / rowHeight) do
+                form.addLine("", nil, false)
+            end
+        end
     else
         text(title, 12, page > 1 and page < 7 and THEME_WARNING_COLOR or nil)
     end
@@ -264,7 +281,6 @@ function wizard.build(page)
         text("Click box and flip desired switch and switch direction.")
     end
     if page == 1 then
-        text("Click the button below to confirm you disabled first four channels", nil, THEME_WARNING_COLOR)
         local field
         field = form.addBooleanField(form.addLine("First four fixed OFF"), nil,
             function() return allocationConfirmed end,
