@@ -12,7 +12,7 @@ function wizard.setHeading(value, y, color)
     lcd.font(FONT_BOLD)
     local _, height = lcd.getTextSize(value)
     lcd.font(oldFont)
-    heading = {text = value, y = y, color = color, height = height + 6}
+    heading = {text = value, y = y, color = color, height = height + 4}
     return heading.height
 end
 
@@ -23,10 +23,10 @@ function wizard.paintTitle()
     lcd.color(lcd.themeColor(THEME_PAGE_BGCOLOR))
     -- The native scrollbar occupies the right edge of this same window.
     -- Keep title background painting inside the form's content area.
-    lcd.drawFilledRectangle(0, 40, width - 16, heading.y + heading.height - 40)
+    lcd.drawFilledRectangle(8, heading.y, width - 24, heading.height)
     lcd.font(FONT_BOLD)
     lcd.color(lcd.themeColor(heading.color or THEME_DEFAULT_COLOR))
-    lcd.drawText(0, heading.y, heading.text)
+    lcd.drawText(8, heading.y, heading.text)
     lcd.font(oldFont)
     lcd.color(oldColor)
 end
@@ -88,9 +88,13 @@ local function text(value, topOffset, themeColor, absolute, isHeading)
         local y = absolute and topOffset or form.height() + (topOffset or 0)
         local height = wizard.setHeading(value, y, themeColor)
         -- Reserve the title's space; the page paint callback draws it in bold.
-        form.addStaticText(nil, {x = 0, y = y, w = textWidth - 16, h = height}, "")
+        form.addStaticText(nil, {x = 8, y = y, w = textWidth - 24, h = height}, "")
         return y + height
     end
+    local _, fontHeight = lcd.getTextSize(value)
+    local lineHeight = fontHeight + 4
+    -- Text blocks do not need the extra spacing of native control rows.
+    topOffset = absolute and (topOffset or 0) or form.height() + (topOffset or 0)
     while #value > 0 do
         local count = #value
         if count > textLimit then
@@ -103,14 +107,12 @@ local function text(value, topOffset, themeColor, absolute, isHeading)
                 count = count - 1
             end
         end
-        local line
-        if not absolute then line = form.addLine("", nil, false) end
-        local field = form.addStaticText(line,
-            {x = 0, y = topOffset or 0, w = textWidth - 16, h = 40},
+        local field = form.addStaticText(nil,
+            {x = 8, y = topOffset, w = textWidth - 24, h = lineHeight},
             count == #value and value or value:sub(1, count))
         if themeColor and field and field.color then field:color(lcd.themeColor(themeColor)) end
-        if count == #value then return (topOffset or 0) + 40 end
-        if absolute then topOffset = (topOffset or 0) + 40 end
+        if count == #value then return topOffset + lineHeight end
+        topOffset = topOffset + lineHeight
         value = value:sub(count + 1):gsub("^ +", "")
     end
 end
@@ -134,9 +136,19 @@ local function switchField(index, line, rect)
     return field
 end
 
+local function yesNoField(line, get, set)
+    local version = system.getVersion()
+    if version.major > 26 or (version.major == 26 and version.minor >= 2) then
+        return form.addBooleanField(line, nil, {
+            get = get, set = set, offLabel = "NO", onLabel = "YES"
+        })
+    end
+    return form.addBooleanField(line, nil, get, set)
+end
+
 local function optionalSwitch(index, label, optionOnly)
     local assignment
-    local field = form.addBooleanField(form.addLine(label), nil,
+    local field = yesNoField(form.addLine(label),
         function() return ignored[index] == true end,
         function(value)
             if attempted then return end
@@ -329,7 +341,7 @@ function wizard.build(page, modelTypeRect, refresh)
     end
     if page == 1 then
         local field
-        field = form.addBooleanField(form.addLine("First four fixed OFF"), nil,
+        field = yesNoField(form.addLine("First four fixed OFF"),
             function() return allocationConfirmed end,
             function(value)
                 if attempted then return end
@@ -373,7 +385,7 @@ function wizard.build(page, modelTypeRect, refresh)
         local ready = validAssignments()
         if not attempted then
             local field
-            field = form.addBooleanField(coloredLine(layout == 3 and "Click button to create CH1-CH8" or "Click button to create CH1-CH9", THEME_ERROR_COLOR), nil,
+            field = yesNoField(coloredLine(layout == 3 and "Click button to create CH1-CH8" or "Click button to create CH1-CH9", THEME_ERROR_COLOR),
                 function() return reviewed end,
                 function(value)
                     if not value or attempted then return end
