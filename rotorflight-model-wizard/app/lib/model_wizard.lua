@@ -26,7 +26,15 @@ function wizard.paintTitle()
     lcd.drawFilledRectangle(8, heading.y, width - 24, heading.height)
     lcd.font(FONT_BOLD)
     lcd.color(lcd.themeColor(heading.color or THEME_DEFAULT_COLOR))
-    lcd.drawText(8, heading.y, heading.text)
+    local reviewPrefix, modelType = heading.text:match("^(Rotorflight review:) (.+)$")
+    if reviewPrefix then
+        lcd.drawText(8, heading.y, reviewPrefix)
+        local prefixWidth = lcd.getTextSize(reviewPrefix .. " ")
+        lcd.color(lcd.themeColor(THEME_DEFAULT_COLOR))
+        lcd.drawText(8 + prefixWidth, heading.y, modelType)
+    else
+        lcd.drawText(8, heading.y, heading.text)
+    end
     lcd.font(oldFont)
     lcd.color(oldColor)
 end
@@ -334,7 +342,7 @@ function wizard.build(page, modelTypeRect, refresh)
             end
         end
     else
-        text(title, 4, page > 1 and page < 7 and THEME_WARNING_COLOR or nil, false, true)
+        text(title, 4, page > 1 and (page < 7 or layout ~= 3) and THEME_WARNING_COLOR or nil, false, true)
     end
     if page > 1 and page < 7 then
         text("Click box and flip desired switch and switch direction.")

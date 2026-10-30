@@ -26,9 +26,9 @@ return function(baseDir)
         local brandingWidth = labelWidth + (headerHeli and 96 or 0) + 24
         local selectorWidth = withModelType and math.min(240, math.floor(width * 0.30)) or 0
         local left = math.floor((width - 16 - brandingWidth - (withModelType and selectorWidth + 12 or 0)) / 2)
-        -- Older Ethos paints its page dots at the top of the form window.
-        -- Keep both branding and the selector below that native indicator.
-        local top = withModelType and 28 or 0
+        -- Ethos 26.2 places its page dots above the form window.
+        -- Only older Ethos needs extra space inside the form for its dots.
+        local top = withModelType and not categoryMode and 28 or 0
         headerLayout = {left = left, top = top, width = brandingWidth, labelWidth = labelWidth, labelHeight = labelHeight}
         form.addStaticText(nil, {x = 8, y = top, w = width - 24, h = 40}, "")
         if withModelType then
@@ -138,8 +138,7 @@ return function(baseDir)
                     y = y + height + 4
                     if field and field.color then field:color(lcd.themeColor(color or THEME_WARNING_COLOR)) end
                 end
-                instruction("System>Sticks then disable")
-                instruction("first 4 CH fixed")
+                instruction("System>Sticks then disable first 4 CH fixed")
                 instruction("Press Create Heli FBL Model below, then choose:")
                 instruction("Large + tile > Create model > Other.")
                 form.addTextButton(form.addLine(""), nil, "Create Heli FBL Model", function()
