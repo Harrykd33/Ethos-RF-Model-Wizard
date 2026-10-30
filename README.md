@@ -26,9 +26,11 @@ The wizard's confirmation switch does not change this setting for you.
 
 Confirm **First four fixed OFF**, select the model type and complete the switch
 assignments. Click each switch box, then flip the physical switch to the desired
-position. On review, turn **Click button to create CH1-CH9** ON for RF layouts,
-or **Click button to create CH1-CH8** ON for Heli FBL. Then continue to name and
+position. On review, set **Click button to create CH1-CH9** to YES for RF layouts,
+or **Click button to create CH1-CH8** to YES for Heli FBL. Then continue to name and
 save the model. Assignments lock after mix creation.
+
+Boolean controls show NO/YES on Ethos 26.2 and newer, and OFF/ON on older versions.
 
 ## Setup
 

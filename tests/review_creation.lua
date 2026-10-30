@@ -1,6 +1,8 @@
 -- Host Lua regression: run from repository root. Firmware APIs are mocked;
 -- native draft persistence still needs a simulator/radio creation check.
 local controller = "rotorflight-model-wizard/app/lib/model_wizard.lua"
+local firmwareMinor = TEST_FIRMWARE_MINOR or 2
+system = {getVersion = function() return {major = 26, minor = firmwareMinor} end}
 THEME_WARNING_COLOR, THEME_ERROR_COLOR = 10, 20
 THEME_PAGE_BGCOLOR, THEME_DEFAULT_COLOR, FONT_BOLD = 30, 40, 50
 CATEGORY_SWITCH_POSITION, CATEGORY_ANALOG, CATEGORY_LOGIC_SWITCH = 1, 2, 3
@@ -13,6 +15,11 @@ for _, category in ipairs({false, true}) do
         for variant = 0, 3 do
             local fields, texts, mixes, logic = {}, {}, {}, 0
             local function field(line, rect, get, set)
+                if type(get) == "table" then
+                    assert(firmwareMinor >= 2, "Older firmware needs the positional boolean API")
+                    assert(get.offLabel == "NO" and get.onLabel == "YES", "Custom boolean labels")
+                    get, set = get.get, get.set
+                end
                 local f = {get = get, set = set, suffix = function() end}
                 function f:enable(value) self.enabled = value end
                 fields[line.label] = f

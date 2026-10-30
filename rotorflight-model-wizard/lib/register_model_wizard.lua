@@ -25,11 +25,14 @@ return function(baseDir)
         lcd.font(oldFont)
         local brandingWidth = labelWidth + (headerHeli and 96 or 0) + 24
         local selectorWidth = withModelType and math.min(240, math.floor(width * 0.30)) or 0
-        local left = math.floor((width - brandingWidth - (withModelType and selectorWidth + 16 or 0)) / 2)
-        headerLayout = {left = left, width = brandingWidth, labelWidth = labelWidth, labelHeight = labelHeight}
-        form.addStaticText(nil, {x = 0, y = 0, w = width - 16, h = 40}, "")
+        local left = math.floor((width - 16 - brandingWidth - (withModelType and selectorWidth + 12 or 0)) / 2)
+        -- Older Ethos paints its page dots at the top of the form window.
+        -- Keep both branding and the selector below that native indicator.
+        local top = withModelType and 28 or 0
+        headerLayout = {left = left, top = top, width = brandingWidth, labelWidth = labelWidth, labelHeight = labelHeight}
+        form.addStaticText(nil, {x = 8, y = top, w = width - 24, h = 40}, "")
         if withModelType then
-            return {x = left + brandingWidth + 16, y = 0, w = selectorWidth, h = 40}
+            return {x = left + brandingWidth + 12, y = top, w = selectorWidth, h = 40}
         end
     end
 
@@ -40,15 +43,15 @@ return function(baseDir)
         local label = "Heli Wizard"
         local left = headerLayout.left + 12
         lcd.color(lcd.themeColor(THEME_DEFAULT_BGCOLOR))
-        lcd.drawFilledRectangle(headerLayout.left, 0, headerLayout.width, 40)
+        lcd.drawFilledRectangle(headerLayout.left, headerLayout.top, headerLayout.width, 40)
         lcd.color(lcd.themeColor(THEME_DEFAULT_COLOR))
-        lcd.drawText(left, math.floor((40 - headerLayout.labelHeight) / 2), label)
-        if headerHeli then lcd.drawMask(left + headerLayout.labelWidth + 16, 2, headerHeli) end
+        lcd.drawText(left, headerLayout.top + math.floor((40 - headerLayout.labelHeight) / 2), label)
+        if headerHeli then lcd.drawMask(left + headerLayout.labelWidth + 16, headerLayout.top + 2, headerHeli) end
         if launcherHeadingY then
             lcd.color(lcd.themeColor(THEME_PAGE_BGCOLOR))
-            lcd.drawFilledRectangle(0, 40, width - 16, launcherHeadingY + launcherHeadingHeight - 40)
+            lcd.drawFilledRectangle(8, launcherHeadingY, width - 24, launcherHeadingHeight)
             lcd.color(lcd.themeColor(THEME_ERROR_COLOR))
-            lcd.drawText(0, launcherHeadingY, "Requirements:")
+            lcd.drawText(8, launcherHeadingY, "Requirements:")
         end
         lcd.font(oldFont)
         lcd.color(oldColor)
@@ -121,17 +124,20 @@ return function(baseDir)
                 active, pending = false, false
                 local width = lcd.getWindowSize()
                 buildHeader()
-                local function instruction(value, color)
-                    local field = form.addStaticText(form.addLine("", nil, false), {x = 0, y = 0, w = width - 16, h = 40}, value)
-                    if field and field.color then field:color(lcd.themeColor(color or THEME_WARNING_COLOR)) end
-                end
                 launcherHeadingY = 44
                 local oldFont = lcd.font()
                 lcd.font(FONT_BOLD)
                 local _, titleHeight = lcd.getTextSize("Requirements:")
                 lcd.font(oldFont)
-                launcherHeadingHeight = titleHeight + 6
-                form.addStaticText(nil, {x = 0, y = launcherHeadingY, w = width - 16, h = launcherHeadingHeight}, "")
+                launcherHeadingHeight = titleHeight + 4
+                form.addStaticText(nil, {x = 8, y = launcherHeadingY, w = width - 24, h = launcherHeadingHeight}, "")
+                local y = launcherHeadingY + launcherHeadingHeight
+                local function instruction(value, color)
+                    local _, height = lcd.getTextSize(value)
+                    local field = form.addStaticText(nil, {x = 8, y = y, w = width - 24, h = height + 4}, value)
+                    y = y + height + 4
+                    if field and field.color then field:color(lcd.themeColor(color or THEME_WARNING_COLOR)) end
+                end
                 instruction("System>Sticks then disable")
                 instruction("first 4 CH fixed")
                 instruction("Press Create Heli FBL Model below, then choose:")

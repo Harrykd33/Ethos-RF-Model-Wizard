@@ -25,6 +25,7 @@ local function staticText(line, rect, value)
 end
 form = {height = function() return 108 end, addLine = line, addStaticText = staticText}
 local function field(label, _, get, set)
+    if type(get) == "table" then get, set = get.get, get.set end
     if type(label) == "table" then label = label.label end
     local result = {get = get, set = set}
     result.enable = function(_, value) result.enabled = value end

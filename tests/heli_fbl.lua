@@ -4,6 +4,7 @@ simulator.sleep(0.2)
 local nativeForm, nativeSize = form, lcd.getWindowSize
 local fields = {}
 local function field(label, rect, get, set)
+    if type(get) == "table" then get, set = get.get, get.set end
     if type(label) == "table" then label = label.label end
     local f = {get = get, set = set, enable = function(self, v) self.enabled = v end, suffix = function() end}
     fields[label] = f
