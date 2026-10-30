@@ -4,7 +4,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 import json
 
 ROOT = Path(__file__).resolve().parent
-FILES = ("main.lua", "icon.png", "legacy-icon.png", "lib/register_model_wizard.lua", "app/lib/model_wizard.lua", "README.md")
+FILES = ("main.lua", "icon.png", "legacy-icon.png", "header-heli.png", "lib/register_model_wizard.lua", "app/lib/model_wizard.lua", "README.md")
 
 
 def main():

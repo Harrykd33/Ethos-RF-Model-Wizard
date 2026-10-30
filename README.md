@@ -10,7 +10,7 @@ the model-category launcher in Ethos 26.2.0.
 1. Extract `rotorflight-model-wizard-standalone-en.zip`.
 2. Copy the complete `rotorflight-model-wizard` folder into the radio or
    simulator's `scripts` folder. Keep the folder name unchanged and include
-   all three Lua files and both icons.
+   all three Lua files, both icons and `header-heli.png`.
 3. Safely eject the radio drive, then fully restart the radio or simulator.
 
 ## Create a model

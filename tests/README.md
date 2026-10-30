@@ -9,6 +9,7 @@ Stage the following files at the scratch workspace root:
 - rotorflight-model-wizard/app/lib/model_wizard.lua as controller.lua
 - rotorflight-model-wizard/lib/register_model_wizard.lua as register.lua
 - rotorflight-model-wizard/icon.png as icon.png
+- rotorflight-model-wizard/header-heli.png as header-heli.png
 - tests/model_wizard.lua as check.lua
 
 Run /check.lua using the simulator macro runner. Test the standard layout
