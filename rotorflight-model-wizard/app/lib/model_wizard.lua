@@ -5,6 +5,31 @@
 
 -- Shared controller for the Rotorflight category and older Other-model pages.
 local wizard = {}
+local heading
+
+function wizard.setHeading(value, y, color)
+    local oldFont = lcd.font()
+    lcd.font(FONT_BOLD)
+    local _, height = lcd.getTextSize(value)
+    lcd.font(oldFont)
+    heading = {text = value, y = y, color = color, height = height + 6}
+    return heading.height
+end
+
+function wizard.paintTitle()
+    if not heading then return end
+    local oldColor, oldFont = lcd.color(), lcd.font()
+    local width = lcd.getWindowSize()
+    lcd.color(lcd.themeColor(THEME_PAGE_BGCOLOR))
+    -- The native scrollbar occupies the right edge of this same window.
+    -- Keep title background painting inside the form's content area.
+    lcd.drawFilledRectangle(0, 40, width - 16, heading.y + heading.height - 40)
+    lcd.font(FONT_BOLD)
+    lcd.color(lcd.themeColor(heading.color or THEME_DEFAULT_COLOR))
+    lcd.drawText(0, heading.y, heading.text)
+    lcd.font(oldFont)
+    lcd.color(oldColor)
+end
 local enabled, reviewed, attempted, allocationConfirmed = false, false, false, false
 local categoryMode = false
 local ignored = {}
@@ -58,7 +83,14 @@ local function selectLayout(selection)
     channelNames[6] = value and "RF Throttle" or "RF Arm"
 end
 
-local function text(value, topOffset, themeColor, absolute)
+local function text(value, topOffset, themeColor, absolute, isHeading)
+    if isHeading then
+        local y = absolute and topOffset or form.height() + (topOffset or 0)
+        local height = wizard.setHeading(value, y, themeColor)
+        -- Reserve the title's space; the page paint callback draws it in bold.
+        form.addStaticText(nil, {x = 0, y = y, w = textWidth - 16, h = height}, "")
+        return y + height
+    end
     while #value > 0 do
         local count = #value
         if count > textLimit then
@@ -193,6 +225,7 @@ local function validAssignments()
 end
 
 function wizard.close()
+    heading = nil
     for key in pairs(positions) do positions[key] = nil end
     for key in pairs(ignored) do ignored[key] = nil end
     enabled, reviewed, attempted, allocationConfirmed = false, false, false, false
@@ -246,11 +279,22 @@ local function positionsText(first)
     return positionName(first) .. "/" .. positionName(first + 1) .. "/" .. positionName(first + 2)
 end
 
-function wizard.build(page)
+function wizard.build(page, modelTypeRect, refresh)
     local width = lcd.getWindowSize()
     if width ~= textWidth then
         textWidth, textLimit = width, math.max(16, math.floor((width - 16) / 14))
     end
+    local modelType = form.addChoiceField(nil, modelTypeRect or {x = width - 208, y = 0, w = 200, h = 40}, layoutChoices,
+        function() return layout end,
+        function(value)
+            if attempted or page ~= 1 then return end
+            selectLayout(value)
+            reviewed = false
+            if refresh then refresh() end
+        end)
+    -- Later pages keep the selected layout visible; change it on Requirements
+    -- so fields from two different layouts cannot be mixed on the current page.
+    modelType:enable(not attempted and page == 1)
     local title = page == 7 and (layout == 3 and "Heli FBL review" or elrs and "Rotorflight review: ELRS" or "Rotorflight review: FrSky")
         or layout == 3 and fblTitles[page] or titles[page]
     if layout == 3 and page == 4 and throttleMode == 2 then title = "ESC gov CH3 / Bank/IdleUP CH7" end
@@ -258,13 +302,12 @@ function wizard.build(page)
         -- Wrapped instructions share a compact text block instead of taking
         -- a full native form row for every line. Reserve its height before
         -- adding controls so the fields cannot overlap the instructions.
-        local y = text(categoryMode and "Requirements:" or title, 4,
-            categoryMode and THEME_ERROR_COLOR or nil, true)
+        local y = text("Requirements:", form.height() + 4, THEME_ERROR_COLOR, true, true)
         if categoryMode then
-            y = text("Go back to System, select Sticks, then disable First four channels fixed.", y,
+            y = text("System>Sticks then disable first 4 CH fixed", y,
                 THEME_WARNING_COLOR, true)
         end
-        y = text("Click the button below to confirm you disabled first four channels", y + 6,
+        y = text("Click the button below to confirm.", y + 6,
             THEME_WARNING_COLOR, true)
         local before = form.height()
         -- Absolute text already contributes to the native form height on
@@ -279,7 +322,7 @@ function wizard.build(page)
             end
         end
     else
-        text(title, 12, page > 1 and page < 7 and THEME_WARNING_COLOR or nil)
+        text(title, 4, page > 1 and page < 7 and THEME_WARNING_COLOR or nil, false, true)
     end
     if page > 1 and page < 7 then
         text("Click box and flip desired switch and switch direction.")
@@ -291,14 +334,6 @@ function wizard.build(page)
             function(value)
                 if attempted then return end
                 allocationConfirmed = value; reviewed = false
-            end)
-        field:enable(not attempted)
-        field = form.addChoiceField(form.addLine("Model type"), nil, layoutChoices,
-            function() return layout end,
-            function(value)
-                if attempted then return end
-                selectLayout(value)
-                reviewed = false
             end)
         field:enable(not attempted)
         if categoryMode and layout ~= 3 then

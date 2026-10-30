@@ -34,7 +34,7 @@ end
 form.addSwitchField, form.addBooleanField = field, field
 form.addChoiceField = function(label, rect, choices, get, set)
     assert(#choices == 3 and choices[1][1] == "FrSky RF" and choices[2][1] == "ELRS RF" and choices[3][1] == "Heli FBL", "Three model types")
-    return field(label, rect, get, set)
+    return field(label or "Model type", rect, get, set)
 end
 form.addTextButton = function(_, _, label, press)
     fields[label] = {press = press}
@@ -42,6 +42,7 @@ end
 local nativeRegister, nativeTool, nativeOpen = system.registerWizardPage, system.registerSystemTool, system.openPage
 local nativeCategory, nativeMask, nativeLoadfile = system.registerWizard, lcd.loadMask, loadfile
 local descriptors, loads, masks, tools = {}, 0, 0, 0
+local headerMasks = 0
 local tool, lastControllerPath, opened
 local register = assert(nativeLoadfile("/register.lua"))()
 system.registerWizardPage = nil
@@ -50,6 +51,10 @@ system.registerWizardPage = function(value) descriptors[#descriptors + 1] = valu
 system.registerSystemTool = function(value) tool = value; tools = tools + 1; return 9 end
 system.openPage = function(value) opened = value end
 lcd.loadMask = function(path)
+    if path:match("/header%-heli%.png$") then
+        headerMasks = headerMasks + 1
+        return nativeMask("/header-heli.png")
+    end
     local expected = system.registerWizard and "/icon.png" or "/legacy-icon.png"
     assert(path == "SCRIPTS:/rfsuite" .. expected or path == "SCRIPTS:/rotorflight-model-wizard" .. expected, "Mode-specific absolute icon path")
     masks = masks + 1
@@ -69,8 +74,8 @@ local function allHidden()
 end
 local function launch()
     tool.create()
-    assert(texts["Requirements:"] and texts["Go back to System, select Sticks, then disable"]
-        and texts["First four channels fixed."] and texts["Large + tile > Create model > Other."], "Legacy launch instructions")
+    assert(type(tool.paint) == "function" and texts["System>Sticks then disable"]
+        and texts["first 4 CH fixed"] and texts["Large + tile > Create model > Other."], "Legacy launch instructions")
     allHidden() -- Opening and cancelling the tool must not arm a session.
     fields["Create Heli FBL Model"].press()
     assert(opened and opened.model == 0, "Tool opens model selection")
@@ -96,6 +101,7 @@ descriptors[1].build()
 assert(loads == 1, "Next normal wizard stays lazy")
 launch()
 assert(loads == 2 and fields["Model type"].get() == 1, "Explicit relaunch resets selections")
+assert(headerMasks == 1, "Header mask reused across legacy launches")
 tool.create()
 descriptors[1].init()
 allHidden() -- Cancelled launcher without a button press does not authorize creation.

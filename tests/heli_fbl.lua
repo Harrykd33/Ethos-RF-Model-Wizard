@@ -12,7 +12,7 @@ end
 form = {height = function() return 108 end, addLine = function(label) return {label = label} end,
     addStaticText = function(line, rect, value) if line and rect and rect.x == 0 then line.label = value end end,
     addSwitchField = field, addBooleanField = field,
-    addChoiceField = function(label, rect, choices, get, set) return field(label, rect, get, set) end,
+    addChoiceField = function(label, rect, choices, get, set) return field(label or "Model type", rect, get, set) end,
     addNumberField = function(line, rect, low, high, get, set) return field(line.label .. " value", rect, get, set) end}
 lcd.getWindowSize = function() return 800, 480 end
 local function set(label, value) assert(fields[label], label).set(value) end

@@ -2,6 +2,7 @@
 -- native draft persistence still needs a simulator/radio creation check.
 local controller = "rotorflight-model-wizard/app/lib/model_wizard.lua"
 THEME_WARNING_COLOR, THEME_ERROR_COLOR = 10, 20
+THEME_PAGE_BGCOLOR, THEME_DEFAULT_COLOR, FONT_BOLD = 30, 40, 50
 CATEGORY_SWITCH_POSITION, CATEGORY_ANALOG, CATEGORY_LOGIC_SWITCH = 1, 2, 3
 ANALOG_STICK_AILERON, ANALOG_STICK_ELEVATOR = 0, 1
 ANALOG_STICK_RUDDER, ANALOG_STICK_THROTTLE = 2, 3
@@ -28,12 +29,24 @@ for _, category in ipairs({false, true}) do
                     return f
                 end,
                 addSwitchField = field, addBooleanField = field,
-                addChoiceField = function(line, rect, choices, get, set) return field(line, rect, get, set) end,
+                addChoiceField = function(line, rect, choices, get, set) return field(line or {label = "Model type"}, rect, get, set) end,
                 addNumberField = function(line, rect, low, high, get, set)
                     return field({label = line.label .. " value"}, rect, get, set)
                 end
             }
             lcd = {getWindowSize = function() return 800, 480 end, themeColor = function(c) return c end}
+            local drawColor, drawFont = 0, 0
+            lcd.color = function(value) if value then drawColor = value end; return drawColor end
+            lcd.font = function(value) if value then drawFont = value end; return drawFont end
+            lcd.getTextSize = function(value) return #value * 12, 24 end
+            lcd.drawFilledRectangle = function(x, y, width, height)
+                assert(x + width <= 784, "Title background must leave the native scrollbar clear")
+                assert(height >= 0, "Title background height")
+            end
+            lcd.drawText = function(x, y, value)
+                assert(drawFont == FONT_BOLD, "Page headings use bold font")
+                texts[value] = {textColor = drawColor}
+            end
             model = {
                 createMix = function(kind, spec) assert(kind == "free"); mixes[#mixes + 1] = spec end,
                 createLogicSwitch = function()
@@ -49,6 +62,7 @@ for _, category in ipairs({false, true}) do
             local wizard = assert(loadfile(controller))()
             if category then wizard.startCategory() else wizard.startLegacy() end
             wizard.build(1)
+            wizard.paintTitle()
             if category then assert(texts["Requirements:"].textColor == THEME_ERROR_COLOR) end
             local confirmationFound = false
             for value, f in pairs(texts) do
@@ -67,6 +81,7 @@ for _, category in ipairs({false, true}) do
             if layout < 3 then
                 local arm, hold = layout == 2 and 5 or 6, layout == 2 and 6 or 3
                 wizard.build(2); set("Armed position (CH" .. arm .. ")", position(0))
+                wizard.paintTitle()
                 assert(texts.Arm.textColor == THEME_WARNING_COLOR)
                 wizard.build(3); set("Throttle hold (CH" .. hold .. ")", position(3))
                 wizard.build(4)
